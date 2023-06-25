@@ -47,8 +47,7 @@ impl<'a> Scanner<'a> {
                 .current
                 .map_or(false, |c| is_alpha(c) || is_digit(c) || c == '?')
             {
-                s.push(self.current.unwrap());
-                self.advance();
+                self.collect(&mut s);
             }
 
             let token = match s.as_ref() {
@@ -66,17 +65,7 @@ impl<'a> Scanner<'a> {
 
         // Handle a number literal.
         if self.current.map_or(false, |c| is_digit(c)) {
-            let mut s = String::new();
-
-            while self.current.map_or(false, |c| is_digit(c)) {
-                s.push(self.current.unwrap());
-                self.advance();
-            }
-
-            return match s.parse() {
-                Ok(x) => Ok(Number(x)),
-                Err(_) => Err(format!("'{}' cannot be converted to a number", s)),
-            };
+            return self.number_literal();
         }
 
         // Handle operators.
@@ -93,6 +82,39 @@ impl<'a> Scanner<'a> {
         self.advance();
 
         return Ok(token);
+    }
+
+    fn number_literal(&mut self) -> Result<Token, String> {
+        let mut s = String::new();
+
+        while self.current.map_or(false, |c| is_digit(c)) {
+            self.collect(&mut s);
+        }
+
+        if self.current.map_or(false, |c| c == '.') {
+            self.collect(&mut s);
+
+            match self.current {
+                Some(c) if is_digit(c) => self.collect(&mut s),
+                _ => {
+                    return Err(String::from("expected digit after decimal point"));
+                }
+            }
+            
+            while self.current.map_or(false, |c| is_digit(c)) {
+                self.collect(&mut s)
+            }
+        }
+
+        match s.parse() {
+            Ok(x) => Ok(Token::Number(x)),
+            Err(_) => Err(format!("'{}' cannot be converted to a number", s)),
+        }
+    }
+
+    fn collect(&mut self, s: &mut String) {
+        s.push(self.current.unwrap());
+        self.advance();
     }
 }
 

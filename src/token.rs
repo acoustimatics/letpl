@@ -13,7 +13,7 @@ pub enum Token {
     LeftParen,
     Let,
     Minus,
-    Number(i64),
+    Number(f64),
     RightParen,
     Then,
     IsZero,

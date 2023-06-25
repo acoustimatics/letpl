@@ -7,7 +7,7 @@ pub struct Program {
 /// Represents an Expression node in an AST.
 #[derive(Debug)]
 pub enum Expr {
-    Const(i64),
+    Const(f64),
     Diff(Box<Expr>, Box<Expr>),
     IsZero(Box<Expr>),
     If(Box<Expr>, Box<Expr>, Box<Expr>),

@@ -9,11 +9,11 @@ LET's grammar is:
     Expression ::= Number
                ::= "-" "(" Expression "," Expression ")"
                ::= "zero?" "(" Expression ")"
-               ::= "if" Expression "then" Expression "else" Expression"
+               ::= "if" Expression "then" Expression "else" Expression
                ::= Identifier
                ::= "let" Identifier "=" Expression "in" Expression
 
-A number is a 64 bit signed integer.
+Numbers are 64 bit floating point values.
 
 `-(x, y)` evaluates to `x` - `y`.
 

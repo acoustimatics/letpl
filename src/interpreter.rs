@@ -18,7 +18,7 @@ fn value_of_program(program: &Program) -> RunResult {
 
 fn value_of(expr: &Expr, env: &Environment<Value>) -> RunResult {
     match expr {
-        Expr::Const(i) => Ok(Value::Number(*i)),
+        Expr::Const(x) => Ok(Value::Number(*x)),
         Expr::Diff(expr1, expr2) => {
             let val1 = value_of(&expr1, env)?;
             let val2 = value_of(&expr2, env)?;
@@ -61,7 +61,7 @@ fn diff(v1: Value, v2: Value) -> RunResult {
 
 fn is_zero(v: Value) -> RunResult {
     if let Value::Number(n) = v {
-        return Ok(Value::Boolean(n == 0));
+        return Ok(Value::Boolean(n == 0.0));
     } else {
         return Err(String::from("zero?() requires a numeric value"));
     }
