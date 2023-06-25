@@ -100,7 +100,7 @@ impl<'a> Scanner<'a> {
                     return Err(String::from("expected digit after decimal point"));
                 }
             }
-            
+
             while self.current.map_or(false, |c| is_digit(c)) {
                 self.collect(&mut s)
             }
