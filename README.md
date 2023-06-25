@@ -24,7 +24,3 @@ Numbers are 64 bit floating point values.
 `let` binds an identifier to a value of the expression after `=`, and then evaluates the expression after `in`. An identfier may be a letter followed by letters and/or digits.
 
 An identifier evaluates to the value bound to it.
-
-# Implementation
-
-The implementation uses a recursive descent parser and an AST walking interpreter.
