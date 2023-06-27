@@ -9,15 +9,25 @@ mod token;
 mod value;
 mod vm;
 
-use crate::compiler::compile;
 use crate::value::Value;
-use crate::vm::run;
 use std::error::Error;
-use std::io;
+use std::{io, fs, env};
 use std::io::Write;
 
 fn main() {
-    repl();
+    let args: Vec<String> = env::args().collect();
+    if args.len() > 2 {
+        println!("Usage: letpl [script]");
+    } else if args.len() == 2 {
+        run_file(&args[1]);
+    } else {
+        repl();
+    }
+}
+
+fn run_file(path: &str) {
+    let result = read_file_eval(path);
+    print(result);
 }
 
 fn repl() -> ! {
@@ -28,10 +38,15 @@ fn repl() -> ! {
     }
 }
 
+fn read_file_eval(path: &str) -> Result<Value, Box<dyn Error>> {
+    let src = fs::read_to_string(path)?;
+    let value = eval(&src)?;
+    Ok(value)
+}
+
 fn read_eval() -> Result<Value, Box<dyn Error>> {
     let src = read()?;
-    let chunk = compile(&src)?;
-    let value = run(&chunk)?;
+    let value = eval(&src)?;
     Ok(value)
 }
 
@@ -41,6 +56,12 @@ fn read() -> Result<String, Box<dyn Error>> {
     let mut buffer = String::new();
     let _ = io::stdin().read_line(&mut buffer)?;
     Ok(buffer)
+}
+
+fn eval(src: &str) -> Result<Value, Box<dyn Error>> {
+    let chunk = compiler::compile(src)?;
+    let value = vm::run(&chunk)?;
+    Ok(value)
 }
 
 fn print(result: Result<Value, Box<dyn Error>>) {
