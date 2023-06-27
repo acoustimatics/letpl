@@ -23,8 +23,13 @@ pub fn run(chunk: &Chunk) -> Result<Value, String> {
                 }
             }
             Op::Apply(name) => {
-                let v = env.apply(name).unwrap();
-                stack.push(*v);
+                match env.apply(name) {
+                    Some(v) => stack.push(*v),
+                    None => {
+                        let msg = format!("unbound identifier `{}`", name);
+                        return Err(msg);
+                    }
+                }
             }
             Op::Bind(name) => {
                 let v = stack.pop().unwrap();
