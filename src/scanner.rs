@@ -56,6 +56,7 @@ impl<'a> Scanner<'a> {
                 "in" => In,
                 "let" => Let,
                 "proc" => Proc,
+                "minus" => Minus,
                 "then" => Then,
                 "zero?" => IsZero,
                 _ => Identifier(s),
@@ -74,7 +75,7 @@ impl<'a> Scanner<'a> {
             '(' => LeftParen,
             ')' => RightParen,
             ',' => Comma,
-            '-' => Minus,
+            '-' => MinusSign,
             '=' => Equal,
             c => return Err(format!("unexpected character '{}'", c)),
         };

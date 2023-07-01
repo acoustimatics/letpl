@@ -21,13 +21,19 @@ macro_rules! pop {
     };
 }
 
+macro_rules! pop_number {
+    ($stack:expr) => {
+        $stack.pop().unwrap().as_number()
+    };
+}
+
 /// Runs a chunk of code which represents an expression returning its value.
 pub fn run(chunk: &Chunk) -> Result<Value, String> {
     let mut stack: Vec<Value> = Vec::new();
     let mut call_stack: Vec<Frame> = Vec::new();
     let mut ip = 0;
     let mut env: Environment<Value> = Environment::empty();
-
+    dbg!(chunk);
     while ip < chunk.ops.len() {
         let op = &chunk.ops[ip];
         ip += 1;
@@ -53,13 +59,13 @@ pub fn run(chunk: &Chunk) -> Result<Value, String> {
                 env = env.extend(name, v);
             }
             Op::Diff => {
-                let x2 = pop!(stack).as_number()?;
-                let x1 = pop!(stack).as_number()?;
+                let x2 = pop_number!(stack)?;
+                let x1 = pop_number!(stack)?;
                 let v = Value::Number(x1 - x2);
                 stack.push(v);
             }
             Op::IsZero => {
-                let x = pop!(stack).as_number()?;
+                let x = pop_number!(stack)?;
                 let v = Value::Boolean(x == 0.0);
                 stack.push(v);
             }
@@ -88,6 +94,11 @@ pub fn run(chunk: &Chunk) -> Result<Value, String> {
                 let proc = Procedure::new(var, *start, &env);
                 let value = Value::Procedure(proc);
                 stack.push(value);
+            }
+            Op::Minus => {
+                let x = pop_number!(stack)?;
+                let v = Value::Number(-x);
+                stack.push(v);
             }
         }
     }

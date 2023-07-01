@@ -27,6 +27,10 @@ fn compile_expr(expr: &Expr, chunk: &mut Chunk) -> Result<(), String> {
             compile_expr(e2, chunk)?;
             chunk.emit(Op::Diff);
         }
+        Expr::Minus(e) => {
+            compile_expr(e, chunk)?;
+            chunk.emit(Op::Minus);
+        }
         Expr::If(guard, consq, alt) => {
             compile_expr(guard, chunk)?;
             let branch_to_consq = chunk.emit(Op::JumpTrue(0));

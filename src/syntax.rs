@@ -24,6 +24,9 @@ pub enum Expr {
     /// Represent an let/in expression.
     Let(String, Box<Expr>, Box<Expr>),
 
+    /// Represents a numerical negation.
+    Minus(Box<Expr>),
+
     /// Represents a procedure.
     Proc(String, Box<Expr>),
 
