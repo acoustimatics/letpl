@@ -1,10 +1,13 @@
 use std::fmt;
 
+use crate::procedure::Procedure;
+
 /// Represents final value to which an expression can evalutate.
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub enum Value {
     Number(f64),
     Boolean(bool),
+    Procedure(Procedure),
 }
 
 impl Value {
@@ -21,6 +24,13 @@ impl Value {
             _ => Err(String::from("value is not a boolean")),
         }
     }
+
+    pub fn as_proc(&self) -> Result<&Procedure, String> {
+        match self {
+            Value::Procedure(p) => Ok(p),
+            _ => Err(String::from("value is not a procedure")),
+        }
+    }
 }
 
 impl fmt::Display for Value {
@@ -28,6 +38,7 @@ impl fmt::Display for Value {
         match self {
             Value::Number(x) => write!(f, "{}", x),
             Value::Boolean(b) => write!(f, "{}", b),
+            Value::Procedure(p) => write!(f, "{}", p),
         }
     }
 }

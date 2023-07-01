@@ -12,6 +12,7 @@ pub enum Token {
     In,
     LeftParen,
     Let,
+    Proc,
     Minus,
     Number(f64),
     RightParen,
@@ -26,11 +27,14 @@ impl fmt::Display for Token {
             Token::Else => "else",
             Token::Eof => "EOF",
             Token::Equal => "=",
-            Token::Identifier(_) => "identifier",
+            Token::Identifier(id) => {
+                return write!(f, "identifier({})", id);
+            }
             Token::If => "if",
             Token::In => "in",
             Token::LeftParen => "(",
             Token::Let => "let",
+            Token::Proc => "proc",
             Token::Minus => "-",
             Token::Number(_) => "number",
             Token::RightParen => ")",

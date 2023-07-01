@@ -3,44 +3,59 @@ use std::fmt;
 
 /// Represents a VM operation.
 pub enum Op {
-    /// Pushes a value bound to a name in the environment onto the stack.
+    /// Push a value bound to a name in the environment onto the stack.
     Apply(String),
 
-    /// Pops a value from the stack and binds the value to a name in the
+    /// Pop a value from the stack and bind the value to a name in the
     /// environment.
     Bind(String),
 
-    /// Unconditionally branches to an index.
-    Branch(usize),
+    /// Pop two values from the stack. The first pop is an argument, the
+    /// second is a procedure. Call the procedure with the argument.
+    Call,
 
-    /// Pops the stack. If the popped value is `true` then branch to an index.
-    BranchTrue(usize),
-
-    /// Pop two values from the stack, subtract them, and push the
-    /// difference on the stack.
+    /// Pop two numbers from the stack, subtract them, and push the
+    /// difference onto the stack.
     Diff,
 
-    /// Pop the stack. If the popped value is zero then push `true` onto the
-    /// stack, otherwise push `false`.
+    /// Pop a number from the stack. If the popped value is zero then push
+    /// `true` onto the stack, otherwise push `false`.
     IsZero,
 
-    /// Pushes an immediate value onto the stack.
+    /// Unconditionally jump to an index.
+    Jump(usize),
+
+    /// Pop a Boolean from the stack. If the popped value is `true` then jump to
+    /// an index.
+    JumpTrue(usize),
+
+    /// Make a procedure using a variable name, start index, and the
+    /// environment. Push the procedure onto the stack.
+    MakeProc(String, usize),
+
+    /// Push a value onto the stack.
     PushValue(Value),
 
-    /// Removes the last binding in the environment.
+    /// Return from a procedure call.
+    Return,
+
+    /// Remove the last binding in the environment.
     Unbind,
 }
 
-impl fmt::Display for Op {
+impl fmt::Debug for Op {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Op::Apply(name) => write!(f, "apply {}", name),
             Op::Bind(name) => write!(f, "bind {}", name),
-            Op::Branch(i) => write!(f, "branch {}", i),
-            Op::BranchTrue(i) => write!(f, "branch-true {}", i),
+            Op::Call => write!(f, "call"),
             Op::Diff => write!(f, "diff"),
             Op::IsZero => write!(f, "is-zero"),
+            Op::Jump(i) => write!(f, "jump {}", i),
+            Op::JumpTrue(i) => write!(f, "jump-true {}", i),
+            Op::MakeProc(var, i) => write!(f, "make-proc ({}) @{}", var, i),
             Op::PushValue(v) => write!(f, "push-value {}", v),
+            Op::Return => write!(f, "return"),
             Op::Unbind => write!(f, "unbind"),
         }
     }

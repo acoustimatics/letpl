@@ -29,9 +29,9 @@ fn compile_expr(expr: &Expr, chunk: &mut Chunk) -> Result<(), String> {
         }
         Expr::If(guard, consq, alt) => {
             compile_expr(guard, chunk)?;
-            let branch_to_consq = chunk.emit(Op::BranchTrue(0));
+            let branch_to_consq = chunk.emit(Op::JumpTrue(0));
             compile_expr(alt, chunk)?;
-            let branch_to_end = chunk.emit(Op::Branch(0));
+            let branch_to_end = chunk.emit(Op::Jump(0));
             let consq_start = chunk.next_index();
             compile_expr(consq, chunk)?;
             let if_end = chunk.next_index();
@@ -48,8 +48,21 @@ fn compile_expr(expr: &Expr, chunk: &mut Chunk) -> Result<(), String> {
             compile_expr(e2, chunk)?;
             chunk.emit(Op::Unbind);
         }
-        Expr::Var(id) => {
-            chunk.emit(Op::Apply(id.clone()));
+        Expr::Var(var) => {
+            chunk.emit(Op::Apply(var.clone()));
+        }
+        Expr::Proc(var, body) => {
+            let branch_make_proc = chunk.emit(Op::Jump(0));
+            let proc_index = chunk.next_index();
+            compile_expr(body, chunk)?;
+            chunk.emit(Op::Return);
+            let make_proc_index = chunk.emit(Op::MakeProc(var.clone(), proc_index));
+            chunk.patch(branch_make_proc, make_proc_index);
+        }
+        Expr::Call(proc, arg) => {
+            compile_expr(proc, chunk)?;
+            compile_expr(arg, chunk)?;
+            chunk.emit(Op::Call);
         }
     }
     Ok(())

@@ -7,7 +7,7 @@ pub struct Chunk {
 
 impl Chunk {
     /// Creates a chunk that is ready for code generation.
-    pub fn new() -> Chunk {
+    pub fn new() -> Self {
         let ops = Vec::new();
         Chunk { ops }
     }
@@ -27,11 +27,11 @@ impl Chunk {
     /// Patches a branch at and Op index with a given index into the chunk.
     pub fn patch(&mut self, op_index: usize, target: usize) {
         match &self.ops[op_index] {
-            Op::Branch(_) => {
-                self.ops[op_index] = Op::Branch(target);
+            Op::Jump(_) => {
+                self.ops[op_index] = Op::Jump(target);
             }
-            Op::BranchTrue(_) => {
-                self.ops[op_index] = Op::BranchTrue(target);
+            Op::JumpTrue(_) => {
+                self.ops[op_index] = Op::JumpTrue(target);
             }
             _ => (),
         }

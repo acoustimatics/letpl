@@ -55,6 +55,7 @@ impl<'a> Scanner<'a> {
                 "if" => If,
                 "in" => In,
                 "let" => Let,
+                "proc" => Proc,
                 "then" => Then,
                 "zero?" => IsZero,
                 _ => Identifier(s),
