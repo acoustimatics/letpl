@@ -4,7 +4,7 @@ An implementation of the programming languages from Chapter 3 of _Essentials of 
 
 # Language
 
-LET's grammar is:
+letpl's grammar is:
 
     Program    ::= Expression
     Expression ::= Number
@@ -18,9 +18,11 @@ LET's grammar is:
 
 Numbers are 64 bit floating point values.
 
-`-(x, y)` evaluates to `x` - `y`.
+`-(x, y)`, where `x` and `y` are numbers, evaluates to `x - y`.
 
-`zero?(x)` evaluates to `true` if `x` is `0`, otherwise it evaluates to `false`.
+`minus(x)`, where `x` is a number, evaluates to `-x`.
+
+`zero?(x)`, where `x` is a number, evaluates to `true` if `x` is `0`, otherwise it evaluates to `false`.
 
 `if` evaluates to the consequent expression if its guard expression is `true`, otherwise it evaluates to the alternative expression.
 
