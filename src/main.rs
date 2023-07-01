@@ -3,6 +3,7 @@ mod compiler;
 mod environment;
 mod op;
 mod parser;
+mod procedure;
 mod scanner;
 mod syntax;
 mod token;
@@ -11,8 +12,8 @@ mod vm;
 
 use crate::value::Value;
 use std::error::Error;
-use std::{io, fs, env};
 use std::io::Write;
+use std::{env, fs, io};
 
 fn main() {
     let args: Vec<String> = env::args().collect();

@@ -23,4 +23,10 @@ pub enum Expr {
 
     /// Represent an let/in expression.
     Let(String, Box<Expr>, Box<Expr>),
+
+    /// Represents a procedure.
+    Proc(String, Box<Expr>),
+
+    /// Represents a procedure call.
+    Call(Box<Expr>, Box<Expr>),
 }
