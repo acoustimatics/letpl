@@ -61,7 +61,8 @@ impl<'a> Parser<'a> {
                 self.advance()?;
                 Ok(Box::new(Expr::Const(x)))
             }
-            Token::Minus => self.diff(),
+            Token::MinusSign => self.diff(),
+            Token::Minus => self.minus(),
             Token::IsZero => self.is_zero(),
             Token::If => self.if_expr(),
             Token::Identifier(var) => {
@@ -85,6 +86,15 @@ impl<'a> Parser<'a> {
         self.expect(Token::RightParen)?;
 
         Ok(Box::new(Expr::Diff(left_expr, right_expr)))
+    }
+
+    fn minus(&mut self) -> ExprResult {
+        self.advance()?;
+        self.expect(Token::LeftParen)?;
+        let expr = self.expr()?;
+        self.expect(Token::RightParen)?;
+
+        Ok(Box::new(Expr::Minus(expr)))
     }
 
     fn is_zero(&mut self) -> ExprResult {

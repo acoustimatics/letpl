@@ -1,3 +1,5 @@
+use std::fmt;
+
 use crate::op::Op;
 
 /// Represents a list of operations runnable on the VM.
@@ -35,5 +37,15 @@ impl Chunk {
             }
             _ => (),
         }
+    }
+}
+
+impl fmt::Debug for Chunk {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "*** chunk {} ops ***", self.ops.len())?;
+        for (i, op) in self.ops.iter().enumerate() {
+            writeln!(f, "{}\t{:?}", i, op)?;
+        }
+        Ok(())
     }
 }

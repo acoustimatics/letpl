@@ -33,6 +33,9 @@ pub enum Op {
     /// environment. Push the procedure onto the stack.
     MakeProc(String, usize),
 
+    /// Pop a number from the stack and push its negative onto the stack.
+    Minus,
+
     /// Push a value onto the stack.
     PushValue(Value),
 
@@ -54,6 +57,7 @@ impl fmt::Debug for Op {
             Op::Jump(i) => write!(f, "jump {}", i),
             Op::JumpTrue(i) => write!(f, "jump-true {}", i),
             Op::MakeProc(var, i) => write!(f, "make-proc ({}) @{}", var, i),
+            Op::Minus => write!(f, "minus"),
             Op::PushValue(v) => write!(f, "push-value {}", v),
             Op::Return => write!(f, "return"),
             Op::Unbind => write!(f, "unbind"),
