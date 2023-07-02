@@ -6,11 +6,11 @@ use crate::value::Value;
 
 struct Frame {
     ip: usize,
-    env: Environment<Value>,
+    env: Environment,
 }
 
 impl Frame {
-    fn new(ip: usize, env: Environment<Value>) -> Frame {
+    fn new(ip: usize, env: Environment) -> Frame {
         Frame { ip, env }
     }
 }
@@ -32,8 +32,8 @@ pub fn run(chunk: &Chunk) -> Result<Value, String> {
     let mut stack: Vec<Value> = Vec::new();
     let mut call_stack: Vec<Frame> = Vec::new();
     let mut ip = 0;
-    let mut env: Environment<Value> = Environment::empty();
-    dbg!(chunk);
+    let mut env = Environment::empty();
+
     while ip < chunk.ops.len() {
         let op = &chunk.ops[ip];
         ip += 1;

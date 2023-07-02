@@ -1,7 +1,6 @@
 use std::fmt;
 
 use crate::environment::Environment;
-use crate::value::Value;
 
 /// Represents a procedure and its captured environment.
 #[derive(Clone)]
@@ -13,11 +12,11 @@ pub struct Procedure {
     pub start: usize,
 
     /// The environment when the procedure object was made.
-    pub env: Environment<Value>,
+    pub env: Environment,
 }
 
 impl Procedure {
-    pub fn new(var: &str, start: usize, env: &Environment<Value>) -> Self {
+    pub fn new(var: &str, start: usize, env: &Environment) -> Self {
         let var = var.to_owned();
         let env = env.clone();
         Procedure { var, start, env }

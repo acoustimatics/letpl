@@ -1,16 +1,18 @@
 use std::fmt;
 use std::rc::Rc;
 
-/// Represents a value bound to a name.
-struct Binding<T> {
-    name: String,
-    value: T,
+use crate::value::Value;
+
+/// A node in a linked list of bindings.
+struct Node<T> {
+    item: T,
+    next: Link<T>,
 }
 
-impl<T> Binding<T> {
-    fn new(name: &str, value: T) -> Binding<T> {
-        let name = name.to_owned();
-        Binding { name, value }
+impl<T> Node<T> {
+    pub fn new(item: T, next: &Link<T>) -> Self {
+        let next = next.clone();
+        Node { item, next }
     }
 }
 
@@ -21,7 +23,7 @@ enum Link<T> {
 }
 
 impl<T> Link<T> {
-    fn from_node(node: Node<T>) -> Link<T> {
+    fn from_node(node: Node<T>) -> Self {
         Link::Node(Rc::new(node))
     }
 
@@ -31,10 +33,14 @@ impl<T> Link<T> {
             Link::Node(n) => Some(n),
         }
     }
+
+    fn iter(&self) -> LinkIterator<T> {
+        LinkIterator::new(self)
+    }
 }
 
 impl<T> Clone for Link<T> {
-    fn clone(&self) -> Link<T> {
+    fn clone(&self) -> Self {
         match self {
             Link::Empty => Link::Empty,
             Link::Node(n) => Link::Node(n.clone()),
@@ -42,26 +48,48 @@ impl<T> Clone for Link<T> {
     }
 }
 
-/// A node in a linked list of bindings.
-struct Node<T> {
-    binding: Binding<T>,
-    next: Link<T>,
+/// Iterator over an Link's items.
+struct LinkIterator<'a, T> {
+    link: &'a Link<T>,
 }
 
-impl<T> Node<T> {
-    pub fn new(binding: Binding<T>, next: &Link<T>) -> Node<T> {
-        let next = next.clone();
-        Node { binding, next }
+impl<'a, T> LinkIterator<'a, T> {
+    fn new(link: &'a Link<T>) -> Self {
+        LinkIterator { link }
+    }
+}
+
+impl<'a, T> Iterator for LinkIterator<'a, T> {
+    type Item = &'a T;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.link.node().map(|n| {
+            self.link = &n.next;
+            &n.item
+        })
+    }
+}
+
+/// Represents a value bound to a name.
+struct Binding {
+    name: String,
+    value: Value,
+}
+
+impl Binding {
+    fn new(name: &str, value: Value) -> Self {
+        let name = name.to_owned();
+        Binding { name, value }
     }
 }
 
 /// Represents a linked list of bindings.
-pub struct Environment<T> {
-    head: Link<T>,
+pub struct Environment {
+    head: Link<Binding>,
 }
 
-impl<T> Environment<T> {
-    fn new(head: Link<T>) -> Self {
+impl Environment {
+    fn new(head: Link<Binding>) -> Self {
         Environment { head }
     }
 
@@ -72,7 +100,7 @@ impl<T> Environment<T> {
 
     /// Creates a new environment by extending a given environment with a new
     /// binding.
-    pub fn extend(&self, name: &str, value: T) -> Self {
+    pub fn extend(&self, name: &str, value: Value) -> Self {
         let binding = Binding::new(name, value);
         let node = Node::new(binding, &self.head);
         let head = Link::from_node(node);
@@ -86,51 +114,26 @@ impl<T> Environment<T> {
     }
 
     /// Returns the value bound to the lookup name if such a binding exists.
-    pub fn apply(&self, lookup_name: &str) -> Option<&T> {
-        self.iter()
+    pub fn apply(&self, lookup_name: &str) -> Option<&Value> {
+        self.head
+            .iter()
             .find(|b| b.name == lookup_name)
             .map(|b| &b.value)
     }
-
-    fn iter(&self) -> EnvironmentIterator<T> {
-        EnvironmentIterator::new(&self.head)
-    }
 }
 
-impl<T> Clone for Environment<T> {
+impl Clone for Environment {
     fn clone(&self) -> Self {
         Environment::new(self.head.clone())
     }
 }
 
-impl<T: fmt::Debug> fmt::Debug for Environment<T> {
+impl fmt::Debug for Environment {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{{ ")?;
-        for binding in self.iter() {
+        for binding in self.head.iter() {
             write!(f, "{}:{:?} ", binding.name, binding.value)?;
         }
         write!(f, "}}")
-    }
-}
-
-/// Iterator over an Environment's bindings.
-struct EnvironmentIterator<'a, T> {
-    link: &'a Link<T>,
-}
-
-impl<'a, T> EnvironmentIterator<'a, T> {
-    fn new(link: &'a Link<T>) -> Self {
-        EnvironmentIterator { link }
-    }
-}
-
-impl<'a, T> Iterator for EnvironmentIterator<'a, T> {
-    type Item = &'a Binding<T>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.link.node().map(|n| {
-            self.link = &n.next;
-            &n.binding
-        })
     }
 }
