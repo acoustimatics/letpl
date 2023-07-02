@@ -55,6 +55,7 @@ impl<'a> Scanner<'a> {
                 "if" => If,
                 "in" => In,
                 "let" => Let,
+                "letrec" => LetRec,
                 "proc" => Proc,
                 "minus" => Minus,
                 "then" => Then,

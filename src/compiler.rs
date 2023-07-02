@@ -57,16 +57,33 @@ fn compile_expr(expr: &Expr, chunk: &mut Chunk) -> Result<(), String> {
         }
         Expr::Proc(var, body) => {
             let branch_make_proc = chunk.emit(Op::Jump(0));
-            let proc_index = chunk.next_index();
+            let start = chunk.emit(Op::Bind(var.clone()));
+            chunk.emit(Op::Pop);
             compile_expr(body, chunk)?;
             chunk.emit(Op::Return);
-            let make_proc_index = chunk.emit(Op::MakeProc(var.clone(), proc_index));
+            let make_proc_index = chunk.emit(Op::MakeProc(start));
             chunk.patch(branch_make_proc, make_proc_index);
         }
         Expr::Call(proc, arg) => {
             compile_expr(proc, chunk)?;
             compile_expr(arg, chunk)?;
             chunk.emit(Op::Call);
+        }
+        Expr::LetRec {
+            name,
+            var,
+            proc_body,
+            let_body,
+        } => {
+            let branch_make_proc = chunk.emit(Op::Jump(0));
+            let start = chunk.emit(Op::Bind(var.clone()));
+            chunk.emit(Op::Bind(name.clone()));
+            compile_expr(proc_body, chunk)?;
+            chunk.emit(Op::Return);
+            let make_proc_index = chunk.emit(Op::MakeProc(start));
+            chunk.patch(branch_make_proc, make_proc_index);
+            chunk.emit(Op::Bind(name.clone()));
+            compile_expr(let_body, chunk)?;
         }
     }
     Ok(())

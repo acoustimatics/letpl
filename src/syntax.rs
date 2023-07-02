@@ -32,4 +32,12 @@ pub enum Expr {
 
     /// Represents a procedure call.
     Call(Box<Expr>, Box<Expr>),
+
+    /// Represents a recursve procedure.
+    LetRec {
+        name: String,
+        var: String,
+        proc_body: Box<Expr>,
+        let_body: Box<Expr>,
+    },
 }

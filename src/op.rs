@@ -10,12 +10,15 @@ pub enum Op {
     /// environment.
     Bind(String),
 
-    /// Pop two values from the stack. The first pop is an argument, the
-    /// second is a procedure. Call the procedure with the argument.
+    /// Call a procedure. Call expects two values at the on the stack: at the
+    /// top an argument and next a procedure. Save he current op index and
+    /// environment to the call stack, then set the instruction index and
+    /// environment to the procedure's start and environment, respectively. The
+    /// procedure's code must pop the argument and procedure from the stack.
     Call,
 
-    /// Pop two numbers from the stack, subtract them, and push the
-    /// difference onto the stack.
+    /// Pop two numbers from the stack, subtract them, and push the difference
+    /// onto the stack.
     Diff,
 
     /// Pop a number from the stack. If the popped value is zero then push
@@ -29,17 +32,22 @@ pub enum Op {
     /// an index.
     JumpTrue(usize),
 
-    /// Make a procedure using a variable name, start index, and the
-    /// environment. Push the procedure onto the stack.
-    MakeProc(String, usize),
+    /// Make a procedure using a start index and the environment. Push the
+    /// procedure onto the stack.
+    MakeProc(usize),
 
     /// Pop a number from the stack and push its negative onto the stack.
     Minus,
 
+    /// Pop a value from the stack and discard it.
+    Pop,
+
     /// Push a value onto the stack.
     PushValue(Value),
 
-    /// Return from a procedure call.
+    /// Return from a procedure. Pop the op index and environment from the call
+    /// stack. For the return value, the procedure's code must have left one
+    /// value on the stack.
     Return,
 
     /// Remove the last binding in the environment.
@@ -56,8 +64,9 @@ impl fmt::Debug for Op {
             Op::IsZero => write!(f, "is-zero"),
             Op::Jump(i) => write!(f, "jump {}", i),
             Op::JumpTrue(i) => write!(f, "jump-true {}", i),
-            Op::MakeProc(var, i) => write!(f, "make-proc ({}) @{}", var, i),
+            Op::MakeProc(i) => write!(f, "make-proc @{}", i),
             Op::Minus => write!(f, "minus"),
+            Op::Pop => write!(f, "pop"),
             Op::PushValue(v) => write!(f, "push-value {}", v),
             Op::Return => write!(f, "return"),
             Op::Unbind => write!(f, "unbind"),

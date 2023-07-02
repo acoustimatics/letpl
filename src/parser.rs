@@ -71,6 +71,7 @@ impl<'a> Parser<'a> {
                 Ok(Box::new(Expr::Var(var)))
             }
             Token::Let => self.let_expr(),
+            Token::LetRec => self.let_rec_expr(),
             Token::Proc => self.proc_expr(),
             Token::LeftParen => self.call_expr(),
             unexpected_token => return Err(format!("unexpected token `{:}`", unexpected_token)),
@@ -126,6 +127,25 @@ impl<'a> Parser<'a> {
         let body = self.expr()?;
 
         Ok(Box::new(Expr::Let(var, expr, body)))
+    }
+
+    fn let_rec_expr(&mut self) -> ExprResult {
+        self.advance()?;
+        let name = self.expect_identifer()?;
+        self.expect(Token::LeftParen)?;
+        let var = self.expect_identifer()?;
+        self.expect(Token::RightParen)?;
+        self.expect(Token::Equal)?;
+        let proc_body = self.expr()?;
+        self.expect(Token::In)?;
+        let let_body = self.expr()?;
+
+        Ok(Box::new(Expr::LetRec {
+            name,
+            var,
+            proc_body,
+            let_body,
+        }))
     }
 
     fn proc_expr(&mut self) -> ExprResult {

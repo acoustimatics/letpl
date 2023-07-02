@@ -5,13 +5,13 @@ use crate::procedure::Procedure;
 use crate::value::Value;
 
 struct Frame {
-    ip: usize,
+    i_op: usize,
     env: Environment,
 }
 
 impl Frame {
-    fn new(ip: usize, env: Environment) -> Frame {
-        Frame { ip, env }
+    fn new(i_op: usize, env: Environment) -> Frame {
+        Frame { i_op, env }
     }
 }
 
@@ -31,20 +31,20 @@ macro_rules! pop_number {
 pub fn run(chunk: &Chunk) -> Result<Value, String> {
     let mut stack: Vec<Value> = Vec::new();
     let mut call_stack: Vec<Frame> = Vec::new();
-    let mut ip = 0;
+    let mut i_op = 0;
     let mut env = Environment::empty();
 
-    while ip < chunk.ops.len() {
-        let op = &chunk.ops[ip];
-        ip += 1;
+    while i_op < chunk.ops.len() {
+        let op = &chunk.ops[i_op];
+        i_op += 1;
 
         match op {
             Op::Jump(i) => {
-                ip = *i;
+                i_op = *i;
             }
             Op::JumpTrue(i) => {
                 if pop!(stack).as_bool()? {
-                    ip = *i;
+                    i_op = *i;
                 }
             }
             Op::Apply(name) => match env.apply(name) {
@@ -69,6 +69,9 @@ pub fn run(chunk: &Chunk) -> Result<Value, String> {
                 let v = Value::Boolean(x == 0.0);
                 stack.push(v);
             }
+            Op::Pop => {
+                let _ = pop!(stack);
+            }
             Op::PushValue(v) => {
                 stack.push(v.clone());
             }
@@ -77,21 +80,19 @@ pub fn run(chunk: &Chunk) -> Result<Value, String> {
             }
             Op::Return => {
                 let frame = pop!(call_stack);
-                ip = frame.ip;
+                i_op = frame.i_op;
                 env = frame.env;
             }
             Op::Call => {
-                call_stack.push(Frame::new(ip, env));
+                let calling_frame = Frame::new(i_op, env);
+                call_stack.push(calling_frame);
 
-                let arg = pop!(stack);
-                let proc_value = pop!(stack);
-
-                let proc = proc_value.as_proc()?;
-                ip = proc.start;
-                env = proc.env.extend(&proc.var, arg);
+                let proc = stack[stack.len() - 2].as_proc()?;
+                i_op = proc.start;
+                env = proc.env.clone();
             }
-            Op::MakeProc(var, start) => {
-                let proc = Procedure::new(var, *start, &env);
+            Op::MakeProc(start) => {
+                let proc = Procedure::new(*start, &env);
                 let value = Value::Procedure(proc);
                 stack.push(value);
             }
