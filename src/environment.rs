@@ -40,7 +40,7 @@ impl Environment {
     pub fn pop(&mut self) -> Result<(), String> {
         match self.bindings.pop() {
             Some(_) => Ok(()),
-            None => Err(format!("environment underflow")),
+            None => Err("environment underflow".to_string()),
         }
     }
 

@@ -41,7 +41,7 @@ impl<'a> Scanner<'a> {
         }
 
         // Handle identifiers and keywords.
-        if self.current.map_or(false, |c| is_alpha(c)) {
+        if self.current.map_or(false, is_alpha) {
             let mut s = String::new();
             while self
                 .current
@@ -67,7 +67,7 @@ impl<'a> Scanner<'a> {
         }
 
         // Handle a number literal.
-        if self.current.map_or(false, |c| is_digit(c)) {
+        if self.current.map_or(false, is_digit) {
             return self.number_literal();
         }
 
@@ -84,13 +84,13 @@ impl<'a> Scanner<'a> {
         // Advance past the last character in the operator.
         self.advance();
 
-        return Ok(token);
+        Ok(token)
     }
 
     fn number_literal(&mut self) -> Result<Token, String> {
         let mut s = String::new();
 
-        while self.current.map_or(false, |c| is_digit(c)) {
+        while self.current.map_or(false, is_digit) {
             self.collect(&mut s);
         }
 
@@ -104,7 +104,7 @@ impl<'a> Scanner<'a> {
                 }
             }
 
-            while self.current.map_or(false, |c| is_digit(c)) {
+            while self.current.map_or(false, is_digit) {
                 self.collect(&mut s)
             }
         }
@@ -122,11 +122,11 @@ impl<'a> Scanner<'a> {
 }
 
 fn is_alpha(c: char) -> bool {
-    (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_'
+    c.is_ascii_alphabetic() || c == '_'
 }
 
 fn is_digit(c: char) -> bool {
-    c >= '0' && c <= '9'
+    c.is_ascii_digit()
 }
 
 fn is_whitespace(c: char) -> bool {

@@ -74,7 +74,7 @@ impl<'a> Parser<'a> {
             Token::LetRec => self.let_rec_expr(),
             Token::Proc => self.proc_expr(),
             Token::LeftParen => self.call_expr(),
-            unexpected_token => return Err(format!("unexpected token `{:}`", unexpected_token)),
+            unexpected_token => Err(format!("unexpected token `{:}`", unexpected_token)),
         }
     }
 

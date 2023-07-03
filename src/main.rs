@@ -17,12 +17,10 @@ use std::{env, fs, io};
 
 fn main() {
     let args: Vec<String> = env::args().collect();
-    if args.len() > 2 {
-        println!("Usage: letpl [script]");
-    } else if args.len() == 2 {
-        run_file(&args[1]);
-    } else {
-        repl();
+    match args.len() {
+        1 => repl(),
+        2 => run_file(&args[1]),
+        _ => println!("Usage: letpl [script]"),
     }
 }
 
