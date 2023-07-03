@@ -1,3 +1,5 @@
+use std::rc::Rc;
+
 use crate::chunk::Chunk;
 use crate::environment::Environment;
 use crate::op::*;
@@ -47,7 +49,7 @@ pub fn run(chunk: &Chunk) -> Result<Value, String> {
                     i_op = *i;
                 }
             }
-            Op::Apply(name) => match env.apply(name) {
+            Op::Apply(name) => match env.fetch(name) {
                 Some(v) => stack.push(v.clone()),
                 None => {
                     let msg = format!("unbound identifier `{}`", name);
@@ -56,7 +58,7 @@ pub fn run(chunk: &Chunk) -> Result<Value, String> {
             },
             Op::Bind(name) => {
                 let v = pop!(stack);
-                env = env.extend(name, v);
+                env.push(name, v);
             }
             Op::Diff => {
                 let x2 = pop_number!(stack)?;
@@ -76,7 +78,7 @@ pub fn run(chunk: &Chunk) -> Result<Value, String> {
                 stack.push(v.clone());
             }
             Op::Unbind => {
-                env = env.retract().unwrap();
+                env.pop()?;
             }
             Op::Return => {
                 let frame = pop!(call_stack);
@@ -87,14 +89,16 @@ pub fn run(chunk: &Chunk) -> Result<Value, String> {
                 let calling_frame = Frame::new(i_op, env);
                 call_stack.push(calling_frame);
 
-                let proc = stack[stack.len() - 2].as_proc()?;
-                i_op = proc.start;
-                env = proc.env.clone();
+                let p = stack[stack.len() - 2].as_proc()?;
+                i_op = p.start;
+                env = p.env.clone();
             }
             Op::MakeProc(start) => {
-                let proc = Procedure::new(*start, &env);
-                let value = Value::Procedure(proc);
-                stack.push(value);
+                let env = env.clone();
+                let p = Procedure::new(*start, env);
+                let p = Rc::new(p);
+                let v = Value::Procedure(p);
+                stack.push(v);
             }
             Op::Minus => {
                 let x = pop_number!(stack)?;

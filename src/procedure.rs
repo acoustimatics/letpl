@@ -3,7 +3,6 @@ use std::fmt;
 use crate::environment::Environment;
 
 /// Represents a procedure and its captured environment.
-#[derive(Clone)]
 pub struct Procedure {
     /// The starting index.
     pub start: usize,
@@ -13,8 +12,7 @@ pub struct Procedure {
 }
 
 impl Procedure {
-    pub fn new(start: usize, env: &Environment) -> Self {
-        let env = env.clone();
+    pub fn new(start: usize, env: Environment) -> Self {
         Procedure { start, env }
     }
 }
