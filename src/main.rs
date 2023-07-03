@@ -1,6 +1,6 @@
+mod binding;
 mod chunk;
 mod compiler;
-mod environment;
 mod op;
 mod parser;
 mod procedure;

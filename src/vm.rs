@@ -1,18 +1,17 @@
 use std::rc::Rc;
 
 use crate::chunk::Chunk;
-use crate::environment::Environment;
-use crate::op::*;
+use crate::op::Op;
 use crate::procedure::Procedure;
 use crate::value::Value;
 
 struct Frame {
     i_op: usize,
-    env: Environment,
+    env: Vec<Value>,
 }
 
 impl Frame {
-    fn new(i_op: usize, env: Environment) -> Frame {
+    fn new(i_op: usize, env: Vec<Value>) -> Frame {
         Frame { i_op, env }
     }
 }
@@ -34,7 +33,7 @@ pub fn run(chunk: &Chunk) -> Result<Value, String> {
     let mut stack: Vec<Value> = Vec::new();
     let mut call_stack: Vec<Frame> = Vec::new();
     let mut i_op = 0;
-    let mut env = Environment::empty();
+    let mut env: Vec<Value> = Vec::new();
 
     while i_op < chunk.ops.len() {
         let op = &chunk.ops[i_op];
@@ -49,16 +48,13 @@ pub fn run(chunk: &Chunk) -> Result<Value, String> {
                     i_op = *i;
                 }
             }
-            Op::Apply(name) => match env.fetch(name) {
-                Some(v) => stack.push(v.clone()),
-                None => {
-                    let msg = format!("unbound identifier `{}`", name);
-                    return Err(msg);
-                }
-            },
-            Op::Bind(name) => {
+            Op::PushBinding(i) => {
+                let v = env[*i].clone();
+                stack.push(v);
+            }
+            Op::Bind => {
                 let v = pop!(stack);
-                env.push(name, v);
+                env.push(v);
             }
             Op::Diff => {
                 let x2 = pop_number!(stack)?;
@@ -78,7 +74,7 @@ pub fn run(chunk: &Chunk) -> Result<Value, String> {
                 stack.push(v.clone());
             }
             Op::Unbind => {
-                env.pop()?;
+                let _ = pop!(env);
             }
             Op::Return => {
                 let frame = pop!(call_stack);

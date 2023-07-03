@@ -1,6 +1,6 @@
 use std::fmt;
 
-use crate::environment::Environment;
+use crate::value::Value;
 
 /// Represents a procedure and its captured environment.
 pub struct Procedure {
@@ -8,11 +8,11 @@ pub struct Procedure {
     pub start: usize,
 
     /// The environment when the procedure object was made.
-    pub env: Environment,
+    pub env: Vec<Value>,
 }
 
 impl Procedure {
-    pub fn new(start: usize, env: Environment) -> Self {
+    pub fn new(start: usize, env: Vec<Value>) -> Self {
         Procedure { start, env }
     }
 }
