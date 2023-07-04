@@ -1,18 +1,16 @@
 use std::fmt;
 
+use crate::chunk::Address;
 use crate::value::Value;
 
 /// Represents a procedure and its captured environment.
 pub struct Procedure {
-    /// The starting index.
-    pub start: usize,
-
-    /// The environment when the procedure object was made.
+    pub start: Address,
     pub env: Vec<Value>,
 }
 
 impl Procedure {
-    pub fn new(start: usize, env: Vec<Value>) -> Self {
+    pub fn new(start: Address, env: Vec<Value>) -> Self {
         Procedure { start, env }
     }
 }

@@ -1,10 +1,11 @@
+use crate::binding::Scope;
+use crate::chunk::Address;
 use crate::value::Value;
 
 /// Represents a VM operation.
 #[derive(Debug)]
 pub enum Op {
-    PushBinding(usize),
-
+    /// Pops the stack and creates a new environment binding.
     Bind,
 
     /// Call a procedure. Call expects two values at the on the stack: at the
@@ -23,21 +24,24 @@ pub enum Op {
     IsZero,
 
     /// Unconditionally jump to an index.
-    Jump(usize),
+    Jump(Address),
 
     /// Pop a Boolean from the stack. If the popped value is `true` then jump to
     /// an index.
-    JumpTrue(usize),
+    JumpTrue(Address),
 
     /// Make a procedure using a start index and the environment. Push the
     /// procedure onto the stack.
-    MakeProc(usize),
+    MakeProc(Address),
 
     /// Pop a number from the stack and push its negative onto the stack.
     Minus,
 
     /// Pop a value from the stack and discard it.
     Pop,
+
+    /// Pushes a environment binding onto the stack.
+    PushBinding(Scope),
 
     /// Push a value onto the stack.
     PushValue(Value),

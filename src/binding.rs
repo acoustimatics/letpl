@@ -1,13 +1,14 @@
-/// Represents a value bound to a name.
+pub type Scope = usize;
+
 struct Binding {
     name: String,
-    depth: usize,
+    scope: Scope,
 }
 
 impl Binding {
-    fn new(name: &str, depth: usize) -> Self {
+    fn new(name: &str, scope: Scope) -> Self {
         let name = name.to_owned();
-        Binding { name, depth }
+        Binding { name, scope }
     }
 }
 
@@ -22,8 +23,8 @@ impl BindingTable {
     }
 
     pub fn push(&mut self, name: &str) {
-        let depth = self.bindings.len();
-        let binding = Binding::new(name, depth);
+        let scope = self.bindings.len();
+        let binding = Binding::new(name, scope);
         self.bindings.push(binding);
     }
 
@@ -34,11 +35,11 @@ impl BindingTable {
         }
     }
 
-    pub fn lookup(&self, lookup_name: &str) -> Option<&usize> {
+    pub fn lookup(&self, lookup_name: &str) -> Option<&Scope> {
         self.bindings
             .iter()
             .rev()
             .find(|b| b.name == lookup_name)
-            .map(|b| &b.depth)
+            .map(|b| &b.scope)
     }
 }
