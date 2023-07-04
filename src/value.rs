@@ -1,4 +1,5 @@
 use std::fmt;
+use std::rc::Rc;
 
 use crate::procedure::Procedure;
 
@@ -7,7 +8,7 @@ use crate::procedure::Procedure;
 pub enum Value {
     Number(f64),
     Boolean(bool),
-    Procedure(Procedure),
+    Procedure(Rc<Procedure>),
 }
 
 impl Value {

@@ -1,20 +1,16 @@
 use std::fmt;
 
-use crate::environment::Environment;
+use crate::chunk::Address;
+use crate::value::Value;
 
 /// Represents a procedure and its captured environment.
-#[derive(Clone)]
 pub struct Procedure {
-    /// The starting index.
-    pub start: usize,
-
-    /// The environment when the procedure object was made.
-    pub env: Environment,
+    pub start: Address,
+    pub env: Vec<Value>,
 }
 
 impl Procedure {
-    pub fn new(start: usize, env: &Environment) -> Self {
-        let env = env.clone();
+    pub fn new(start: Address, env: Vec<Value>) -> Self {
         Procedure { start, env }
     }
 }

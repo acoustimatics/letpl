@@ -1,14 +1,12 @@
+use crate::binding::Scope;
+use crate::chunk::Address;
 use crate::value::Value;
-use std::fmt;
 
 /// Represents a VM operation.
+#[derive(Debug)]
 pub enum Op {
-    /// Push a value bound to a name in the environment onto the stack.
-    Apply(String),
-
-    /// Pop a value from the stack and bind the value to a name in the
-    /// environment.
-    Bind(String),
+    /// Pops the stack and creates a new environment binding.
+    Bind,
 
     /// Call a procedure. Call expects two values at the on the stack: at the
     /// top an argument and next a procedure. Save he current op index and
@@ -26,21 +24,24 @@ pub enum Op {
     IsZero,
 
     /// Unconditionally jump to an index.
-    Jump(usize),
+    Jump(Address),
 
     /// Pop a Boolean from the stack. If the popped value is `true` then jump to
     /// an index.
-    JumpTrue(usize),
+    JumpTrue(Address),
 
     /// Make a procedure using a start index and the environment. Push the
     /// procedure onto the stack.
-    MakeProc(usize),
+    MakeProc(Address),
 
     /// Pop a number from the stack and push its negative onto the stack.
     Minus,
 
     /// Pop a value from the stack and discard it.
     Pop,
+
+    /// Pushes a environment binding onto the stack.
+    PushBinding(Scope),
 
     /// Push a value onto the stack.
     PushValue(Value),
@@ -52,24 +53,4 @@ pub enum Op {
 
     /// Remove the last binding in the environment.
     Unbind,
-}
-
-impl fmt::Debug for Op {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Op::Apply(name) => write!(f, "apply {}", name),
-            Op::Bind(name) => write!(f, "bind {}", name),
-            Op::Call => write!(f, "call"),
-            Op::Diff => write!(f, "diff"),
-            Op::IsZero => write!(f, "is-zero"),
-            Op::Jump(i) => write!(f, "jump {}", i),
-            Op::JumpTrue(i) => write!(f, "jump-true {}", i),
-            Op::MakeProc(i) => write!(f, "make-proc @{}", i),
-            Op::Minus => write!(f, "minus"),
-            Op::Pop => write!(f, "pop"),
-            Op::PushValue(v) => write!(f, "push-value {}", v),
-            Op::Return => write!(f, "return"),
-            Op::Unbind => write!(f, "unbind"),
-        }
-    }
 }
