@@ -74,7 +74,7 @@ impl fmt::Debug for CaptureTable {
 
 struct CompilerState {
     chunk: Chunk,
-    fake_local: BindingTable,
+    local: BindingTable,
     outer: Vec<BindingTable>,
     captures: Vec<CaptureTable>,
     depth: usize,
@@ -89,7 +89,7 @@ impl CompilerState {
         let depth = 0;
         Self {
             chunk,
-            fake_local,
+            local: fake_local,
             outer,
             captures,
             depth,
@@ -98,31 +98,31 @@ impl CompilerState {
 
     fn bind(&mut self, name: &str) -> Address {
         let a = self.chunk.emit(Op::Bind);
-        self.fake_local.push(name);
+        self.local.push(name);
         a
     }
 
     fn unbind(&mut self) -> Result<(), String> {
-        self.fake_local.pop()?;
+        self.local.pop()?;
         Ok(())
     }
 
     fn begin_proc(&mut self) {
-        let fake_local = std::mem::replace(&mut self.fake_local, BindingTable::new());
+        let fake_local = std::mem::replace(&mut self.local, BindingTable::new());
         self.outer.push(fake_local);
         self.captures.push(CaptureTable::new());
         self.depth += 1;
     }
 
     fn end_proc(&mut self) -> CaptureTable {
-        self.fake_local = self.outer.pop().unwrap();
+        self.local = self.outer.pop().unwrap();
         let captures = self.captures.pop().unwrap();
         self.depth -= 1;
         captures
     }
 
     fn lookup(&mut self, lookup_name: &str) -> Option<Op> {
-        match self.fake_local.lookup(lookup_name) {
+        match self.local.lookup(lookup_name) {
             Some(scope) => Some(Op::PushLocal(*scope)),
             None if self.depth > 0 => {
                 self.capture(lookup_name, self.depth - 1)
