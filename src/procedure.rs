@@ -1,4 +1,5 @@
 use std::fmt;
+use std::rc::Rc;
 
 use crate::chunk::Address;
 use crate::value::Value;
@@ -6,12 +7,13 @@ use crate::value::Value;
 /// Represents a procedure and its captured environment.
 pub struct Procedure {
     pub start: Address,
-    pub env: Vec<Value>,
+    pub captures: Rc<Vec<Value>>,
 }
 
 impl Procedure {
-    pub fn new(start: Address, env: Vec<Value>) -> Self {
-        Procedure { start, env }
+    pub fn new(start: Address, captures: Vec<Value>) -> Self {
+        let captures = Rc::new(captures);
+        Self { start, captures }
     }
 }
 

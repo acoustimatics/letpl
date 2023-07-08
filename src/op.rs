@@ -2,6 +2,12 @@ use crate::binding::Scope;
 use crate::chunk::Address;
 use crate::value::Value;
 
+#[derive(Debug)]
+pub enum Capture {
+    Local(Scope),
+    Capture(usize),
+}
+
 /// Represents a VM operation.
 #[derive(Debug)]
 pub enum Op {
@@ -32,7 +38,7 @@ pub enum Op {
 
     /// Make a procedure using a start index and the environment. Push the
     /// procedure onto the stack.
-    MakeProc(Address),
+    MakeProc(Address, Vec<Capture>),
 
     /// Pop a number from the stack and push its negative onto the stack.
     Minus,
@@ -40,8 +46,10 @@ pub enum Op {
     /// Pop a value from the stack and discard it.
     Pop,
 
+    PushCapture(usize),
+
     /// Pushes a environment binding onto the stack.
-    PushBinding(Scope),
+    PushLocal(Scope),
 
     /// Push a value onto the stack.
     PushValue(Value),
@@ -50,7 +58,4 @@ pub enum Op {
     /// stack. For the return value, the procedure's code must have left one
     /// value on the stack.
     Return,
-
-    /// Remove the last binding in the environment.
-    Unbind,
 }

@@ -1,5 +1,8 @@
+use std::fmt;
+
 pub type Scope = usize;
 
+#[derive(Clone)]
 struct Binding {
     name: String,
     scope: Scope,
@@ -12,6 +15,7 @@ impl Binding {
     }
 }
 
+#[derive(Clone)]
 pub struct BindingTable {
     bindings: Vec<Binding>,
 }
@@ -41,5 +45,15 @@ impl BindingTable {
             .rev()
             .find(|b| b.name == lookup_name)
             .map(|b| &b.scope)
+    }
+}
+
+impl fmt::Debug for BindingTable {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{{ ")?;
+        for binding in self.bindings.iter() {
+            write!(f, "{}#{} ", binding.name, binding.scope)?;
+        }
+        write!(f, "}}")
     }
 }

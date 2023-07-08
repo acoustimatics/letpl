@@ -1,31 +1,150 @@
-use crate::binding::BindingTable;
+use std::fmt;
+
+use crate::binding::{BindingTable, Scope};
 use crate::chunk::{Address, Chunk};
 use crate::op::Op;
 use crate::parser::parse;
 use crate::syntax::{Expr, Program};
 use crate::value::Value;
 
+#[derive(Debug)]
+struct Capture {
+    name: String,
+    is_local: bool,
+    index: usize,
+}
+
+struct CaptureTable {
+    captures: Vec<Capture>,
+}
+
+impl CaptureTable {
+    fn new() -> Self {
+        Self {
+            captures: Vec::new(),
+        }
+    }
+
+    fn add_local_capture(&mut self, name: &str, scope: Scope) -> usize {
+        let name = name.to_owned();
+        let is_local = true;
+        let index = scope;
+        let capture = Capture {
+            name,
+            is_local,
+            index,
+        };
+        self.captures.push(capture);
+        self.captures.len() - 1
+    }
+
+    fn add_capture_capture(&mut self, name: &str, outer_index: usize) -> usize {
+        let name = name.to_owned();
+        let is_local = false;
+        let index = outer_index;
+        let capture = Capture {
+            name,
+            is_local,
+            index,
+        };
+        self.captures.push(capture);
+        self.captures.len() - 1
+    }
+
+    pub fn lookup(&self, lookup_name: &str) -> Option<usize> {
+        self.captures
+            .iter()
+            .enumerate()
+            .rev()
+            .find(|(_, c)| c.name == lookup_name)
+            .map(|(i, _)| i)
+    }
+}
+
+impl fmt::Debug for CaptureTable {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{{ ")?;
+        for c in self.captures.iter() {
+            let kind = if c.is_local { "local" } else { "capture" };
+            write!(f, "{}:{}#{} ", c.name, kind, c.index)?;
+        }
+        write!(f, "}}")
+    }
+}
+
 struct CompilerState {
     chunk: Chunk,
-    bindings: BindingTable,
+    fake_local: BindingTable,
+    outer: Vec<BindingTable>,
+    captures: Vec<CaptureTable>,
+    depth: usize,
 }
 
 impl CompilerState {
     fn new() -> Self {
         let chunk = Chunk::new();
-        let bindings = BindingTable::new();
-        Self { chunk, bindings }
+        let fake_local = BindingTable::new();
+        let outer = Vec::new();
+        let captures = Vec::new();
+        let depth = 0;
+        Self {
+            chunk,
+            fake_local,
+            outer,
+            captures,
+            depth,
+        }
     }
 
     fn bind(&mut self, name: &str) -> Address {
         let a = self.chunk.emit(Op::Bind);
-        self.bindings.push(name);
+        self.fake_local.push(name);
         a
     }
 
     fn unbind(&mut self) -> Result<(), String> {
-        self.chunk.emit(Op::Unbind);
-        self.bindings.pop()
+        self.fake_local.pop()?;
+        Ok(())
+    }
+
+    fn begin_proc(&mut self) {
+        let fake_local = std::mem::replace(&mut self.fake_local, BindingTable::new());
+        self.outer.push(fake_local);
+        self.captures.push(CaptureTable::new());
+        self.depth += 1;
+    }
+
+    fn end_proc(&mut self) -> CaptureTable {
+        self.fake_local = self.outer.pop().unwrap();
+        let captures = self.captures.pop().unwrap();
+        self.depth -= 1;
+        captures
+    }
+
+    fn lookup(&mut self, lookup_name: &str) -> Option<Op> {
+        match self.fake_local.lookup(lookup_name) {
+            Some(scope) => Some(Op::PushLocal(*scope)),
+            None if self.depth > 0 => {
+                self.capture(lookup_name, self.depth - 1)
+                    .map(|index| Op::PushCapture(index))
+            }
+            None => None,
+        }
+    }
+
+    fn capture(&mut self, lookup_name: &str, level: usize) -> Option<usize> {
+        if let Some(scope) = self.outer[level].lookup(lookup_name) {
+            let index = self.captures[level].add_local_capture(lookup_name, *scope);
+            Some(index)
+        } else if let Some(index) = self.captures[level].lookup(lookup_name) {
+            Some(index)
+        } else if level > 0 {
+            self.capture(lookup_name, level - 1).map(|outer_index| {
+                self.captures[level].add_capture_capture(lookup_name, outer_index)
+            })
+        } else {
+            None
+        }
     }
 }
 
@@ -92,14 +211,25 @@ fn compile_expr(expr: &Expr, state: &mut CompilerState) -> Result<(), String> {
         } => {
             let branch_make_proc = state.chunk.emit(Op::Jump(0));
 
+            state.begin_proc();
             let start = state.bind(var);
             state.bind(name);
             compile_expr(proc_body, state)?;
             state.chunk.emit(Op::Return);
-            state.bindings.pop()?;
-            state.bindings.pop()?;
+            let captures = state.end_proc();
 
-            let make_proc_index = state.chunk.emit(Op::MakeProc(start));
+            let capture_ops: Vec<crate::op::Capture> = captures.captures
+                .iter()
+                .map(|c| {
+                    if c.is_local {
+                        crate::op::Capture::Local(c.index)
+                    } else {
+                        crate::op::Capture::Capture(c.index)
+                    }
+                })
+                .collect();
+
+            let make_proc_index = state.chunk.emit(Op::MakeProc(start, capture_ops));
             state.chunk.patch(branch_make_proc, make_proc_index);
             state.bind(name);
             compile_expr(let_body, state)?;
@@ -113,21 +243,32 @@ fn compile_expr(expr: &Expr, state: &mut CompilerState) -> Result<(), String> {
 
         Expr::Proc(var, body) => {
             let branch_make_proc = state.chunk.emit(Op::Jump(0));
+            state.begin_proc();
             let start = state.bind(var);
             state.chunk.emit(Op::Pop);
             compile_expr(body, state)?;
             state.chunk.emit(Op::Return);
-            state.bindings.pop()?;
-            let make_proc_index = state.chunk.emit(Op::MakeProc(start));
+            let captures = state.end_proc();
+
+            let capture_ops: Vec<crate::op::Capture> = captures.captures
+                .iter()
+                .map(|c| {
+                    if c.is_local {
+                        crate::op::Capture::Local(c.index)
+                    } else {
+                        crate::op::Capture::Capture(c.index)
+                    }
+                })
+                .collect();
+            let make_proc_index = state.chunk.emit(Op::MakeProc(start, capture_ops));
             state.chunk.patch(branch_make_proc, make_proc_index);
         }
 
         Expr::Var(var) => {
-            let scope = match state.bindings.lookup(var) {
-                Some(depth) => *depth,
+            match state.lookup(var) {
+                Some(op) => state.chunk.emit(op),
                 None => return Err(format!("undefined name: {}", var)),
             };
-            state.chunk.emit(Op::PushBinding(scope));
         }
     }
 
