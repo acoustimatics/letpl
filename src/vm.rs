@@ -7,13 +7,17 @@ use crate::value::Value;
 
 struct Frame {
     next_op: Address,
-    env: Vec<Value>,
+    stack_index: usize,
     captures: Rc<Vec<Value>>,
 }
 
 impl Frame {
-    fn new(next_op: Address, env: Vec<Value>, captures: Rc<Vec<Value>>) -> Self {
-        Self { next_op, env, captures }
+    fn new(next_op: Address, stack_index: usize, captures: Rc<Vec<Value>>) -> Self {
+        Self {
+            next_op,
+            stack_index,
+            captures,
+        }
     }
 }
 
@@ -30,30 +34,26 @@ macro_rules! pop_number {
 }
 
 pub fn run(chunk: &Chunk) -> Result<Value, String> {
+    dbg!(chunk);
     let mut stack = Vec::<Value>::new();
     let mut call_stack = Vec::<Frame>::new();
 
     let mut next_op: Address = 0;
-    let mut env = Vec::<Value>::new();
+    let mut frame_stack_index = 0;
     let mut captures = Rc::new(Vec::<Value>::new());
- 
+
     while next_op < chunk.ops.len() {
         let op = &chunk.ops[next_op];
         next_op += 1;
 
         match op {
-            Op::Bind => {
-                let v = pop!(stack);
-                env.push(v);
-            }
-
             Op::Call => {
-                let calling_frame = Frame::new(next_op, env, captures);
+                let calling_frame = Frame::new(next_op, frame_stack_index, captures);
                 call_stack.push(calling_frame);
 
-                let p = stack[stack.len() - 2].as_proc()?;
+                frame_stack_index = stack.len() - 2;
+                let p = stack[frame_stack_index].as_proc()?;
                 next_op = p.start;
-                env = Vec::new();
                 captures = Rc::clone(&p.captures);
             }
 
@@ -83,11 +83,11 @@ pub fn run(chunk: &Chunk) -> Result<Value, String> {
             Op::MakeProc(start, capture_ops) => {
                 let proc_captures: Vec<Value> = capture_ops
                     .iter()
-                    .map(|c| {
-                        match c {
-                            Capture::Local(scope) => env[*scope].clone(),
-                            Capture::Capture(index) => captures[*index].clone(),
+                    .map(|c| match c {
+                        Capture::Local(index) => {
+                            stack[frame_stack_index + index].clone()
                         }
+                        Capture::Capture(index) => captures[*index].clone(),
                     })
                     .collect();
                 let proc = Procedure::new(*start, proc_captures);
@@ -102,17 +102,13 @@ pub fn run(chunk: &Chunk) -> Result<Value, String> {
                 stack.push(v);
             }
 
-            Op::Pop => {
-                let _ = pop!(stack);
-            }
-
-            Op::PushCapture(index) => {
-                let v = captures[*index].clone();
+            Op::PushCapture(capture_index) => {
+                let v = captures[*capture_index].clone();
                 stack.push(v);
             }
 
-            Op::PushLocal(scope) => {
-                let v = env[*scope].clone();
+            Op::PushLocal(stack_index) => {
+                let v = stack[frame_stack_index + stack_index].clone();
                 stack.push(v);
             }
 
@@ -121,13 +117,21 @@ pub fn run(chunk: &Chunk) -> Result<Value, String> {
             }
 
             Op::Return => {
+                let return_value = stack[stack.len() - 1].clone();
+                for _ in frame_stack_index..stack.len() {
+                    pop!(stack);
+                }
+                stack.push(return_value);
+
                 let frame = pop!(call_stack);
                 next_op = frame.next_op;
-                env = frame.env;
+                frame_stack_index = frame.stack_index;
                 captures = frame.captures;
             }
         }
     }
+
+    dbg!(stack.len());
 
     Ok(pop!(stack))
 }

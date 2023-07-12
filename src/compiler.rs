@@ -1,7 +1,7 @@
 use std::fmt;
 
-use crate::binding::{BindingTable, Scope};
-use crate::chunk::{Address, Chunk};
+use crate::binding::BindingTable;
+use crate::chunk::Chunk;
 use crate::op::Op;
 use crate::parser::parse;
 use crate::syntax::{Expr, Program};
@@ -25,7 +25,7 @@ impl CaptureTable {
         }
     }
 
-    fn add_local_capture(&mut self, name: &str, scope: Scope) -> usize {
+    fn add_local_capture(&mut self, name: &str, scope: usize) -> usize {
         let name = name.to_owned();
         let is_local = true;
         let index = scope;
@@ -72,76 +72,106 @@ impl fmt::Debug for CaptureTable {
     }
 }
 
+struct Frame {
+    stack_top: usize,
+    locals: BindingTable,
+    captures: CaptureTable,
+}
+
 struct CompilerState {
-    chunk: Chunk,
-    local: BindingTable,
-    outer: Vec<BindingTable>,
-    captures: Vec<CaptureTable>,
-    depth: usize,
+    stack_top: usize,
+    save_stack: Vec<usize>,
+    locals: BindingTable,
+    call_stack: Vec<Frame>,
 }
 
 impl CompilerState {
     fn new() -> Self {
-        let chunk = Chunk::new();
-        let fake_local = BindingTable::new();
-        let outer = Vec::new();
-        let captures = Vec::new();
-        let depth = 0;
         Self {
-            chunk,
-            local: fake_local,
-            outer,
-            captures,
-            depth,
+            stack_top: 0,
+            save_stack: Vec::new(),
+            locals: BindingTable::new(),
+            call_stack: Vec::new(),
         }
     }
 
-    fn bind(&mut self, name: &str) -> Address {
-        let a = self.chunk.emit(Op::Bind);
-        self.local.push(name);
-        a
+    fn push(&mut self) {
+        self.stack_top += 1;
     }
 
-    fn unbind(&mut self) -> Result<(), String> {
-        self.local.pop()?;
-        Ok(())
+    fn pop(&mut self) {
+        self.stack_top -= 1;
     }
 
-    fn begin_proc(&mut self) {
-        let fake_local = std::mem::replace(&mut self.local, BindingTable::new());
-        self.outer.push(fake_local);
-        self.captures.push(CaptureTable::new());
-        self.depth += 1;
+    fn save_stack(&mut self) {
+        self.save_stack.push(self.stack_top);
+    }
+
+    fn restore_stack(&mut self) {
+        self.stack_top = self.save_stack.pop().expect("save stack underflow");
+    }
+
+    fn begin_scope(&mut self, name: &str) {
+        self.locals.push(name, self.stack_top - 1);
+    }
+
+    fn end_scope(&mut self) {
+        self.locals.pop()
+    }
+
+    fn begin_proc(&mut self, name: &str, var: &str) {
+        let stack_top = std::mem::replace(&mut self.stack_top, 0);
+        let locals = std::mem::replace(&mut self.locals, BindingTable::new());
+        let frame = Frame {
+            stack_top,
+            locals,
+            captures: CaptureTable::new(),
+        };
+        self.call_stack.push(frame);
+
+        // simulate pushing proc object and argument
+        self.push();
+        self.begin_scope(name);
+        self.push();
+        self.begin_scope(var);
     }
 
     fn end_proc(&mut self) -> CaptureTable {
-        self.local = self.outer.pop().unwrap();
-        let captures = self.captures.pop().unwrap();
-        self.depth -= 1;
-        captures
+        let frame = self.call_stack.pop().expect("call stack underflow");
+        self.stack_top = frame.stack_top;
+        self.locals = frame.locals;
+        frame.captures
     }
 
-    fn lookup(&mut self, lookup_name: &str) -> Option<Op> {
-        match self.local.lookup(lookup_name) {
-            Some(scope) => Some(Op::PushLocal(*scope)),
-            None if self.depth > 0 => {
-                self.capture(lookup_name, self.depth - 1)
-                    .map(|index| Op::PushCapture(index))
-            }
-            None => None,
+    fn lookup_local(&mut self, lookup_name: &str) -> Option<usize> {
+        self.locals.lookup(lookup_name)
+    }
+
+    fn lookup_capture(&mut self, lookup_name: &str) -> Option<usize> {
+        let call_depth = self.call_stack.len();
+        if call_depth > 0 {
+            self.capture(lookup_name, call_depth - 1)
+        } else {
+            None
         }
     }
 
-    fn capture(&mut self, lookup_name: &str, level: usize) -> Option<usize> {
-        if let Some(scope) = self.outer[level].lookup(lookup_name) {
-            let index = self.captures[level].add_local_capture(lookup_name, *scope);
-            Some(index)
-        } else if let Some(index) = self.captures[level].lookup(lookup_name) {
-            Some(index)
-        } else if level > 0 {
-            self.capture(lookup_name, level - 1).map(|outer_index| {
-                self.captures[level].add_capture_capture(lookup_name, outer_index)
-            })
+    fn capture(&mut self, lookup_name: &str, call_depth: usize) -> Option<usize> {
+        if let Some(stack_index) = self.call_stack[call_depth].locals.lookup(lookup_name) {
+            let capture_index = self.call_stack[call_depth]
+                .captures
+                .add_local_capture(lookup_name, stack_index);
+            Some(capture_index)
+        } else if let Some(capture_index) = self.call_stack[call_depth].captures.lookup(lookup_name)
+        {
+            Some(capture_index)
+        } else if call_depth > 0 {
+            self.capture(lookup_name, call_depth - 1)
+                .map(|outer_capture_index| {
+                    self.call_stack[call_depth]
+                        .captures
+                        .add_capture_capture(lookup_name, outer_capture_index)
+                })
         } else {
             None
         }
@@ -155,52 +185,69 @@ pub fn compile(src: &str) -> Result<Chunk, String> {
 }
 
 fn compile_program(program: &Program) -> Result<Chunk, String> {
+    let mut chunk = Chunk::new();
     let mut state = CompilerState::new();
-    compile_expr(&program.expr, &mut state)?;
-    Ok(state.chunk)
+    compile_expr(&program.expr, &mut chunk, &mut state)?;
+    Ok(chunk)
 }
 
-fn compile_expr(expr: &Expr, state: &mut CompilerState) -> Result<(), String> {
+fn compile_expr(expr: &Expr, chunk: &mut Chunk, state: &mut CompilerState) -> Result<(), String> {
     match expr {
         Expr::Call(proc, arg) => {
-            compile_expr(proc, state)?;
-            compile_expr(arg, state)?;
-            state.chunk.emit(Op::Call);
+            compile_expr(proc, chunk, state)?;
+            compile_expr(arg, chunk, state)?;
+            state.pop();
+            state.pop();
+            chunk.emit(Op::Call);
+            state.push();
         }
 
         Expr::Const(x) => {
             let v = Value::Number(*x);
-            state.chunk.emit(Op::PushValue(v));
+            chunk.emit(Op::PushValue(v));
+            state.push();
         }
 
         Expr::Diff(e1, e2) => {
-            compile_expr(e1, state)?;
-            compile_expr(e2, state)?;
-            state.chunk.emit(Op::Diff);
+            compile_expr(e1, chunk, state)?;
+            compile_expr(e2, chunk, state)?;
+            state.pop();
+            state.pop();
+            chunk.emit(Op::Diff);
+            state.push();
         }
 
         Expr::If(guard, consq, alt) => {
-            compile_expr(guard, state)?;
-            let branch_to_consq = state.chunk.emit(Op::JumpTrue(0));
-            compile_expr(alt, state)?;
-            let branch_to_end = state.chunk.emit(Op::Jump(0));
-            let consq_start = state.chunk.next_address();
-            compile_expr(consq, state)?;
-            let if_end = state.chunk.next_address();
-            state.chunk.patch(branch_to_consq, consq_start);
-            state.chunk.patch(branch_to_end, if_end);
+            compile_expr(guard, chunk, state)?;
+            state.pop();
+            let branch_to_consq = chunk.emit(Op::JumpTrue(0));
+
+            state.save_stack();
+
+            compile_expr(alt, chunk, state)?;
+            let branch_to_end = chunk.emit(Op::Jump(0));
+
+            state.restore_stack();
+
+            let consq_start = chunk.next_address();
+            compile_expr(consq, chunk, state)?;
+            let if_end = chunk.next_address();
+            chunk.patch(branch_to_consq, consq_start);
+            chunk.patch(branch_to_end, if_end);
         }
 
         Expr::IsZero(e) => {
-            compile_expr(e, state)?;
-            state.chunk.emit(Op::IsZero);
+            compile_expr(e, chunk, state)?;
+            state.pop();
+            chunk.emit(Op::IsZero);
+            state.push();
         }
 
         Expr::Let(var, e1, e2) => {
-            compile_expr(e1, state)?;
-            state.bind(var);
-            compile_expr(e2, state)?;
-            state.unbind()?;
+            compile_expr(e1, chunk, state)?;
+            state.begin_scope(var);
+            compile_expr(e2, chunk, state)?;
+            state.end_scope();
         }
 
         Expr::LetRec {
@@ -209,16 +256,16 @@ fn compile_expr(expr: &Expr, state: &mut CompilerState) -> Result<(), String> {
             proc_body,
             let_body,
         } => {
-            let branch_make_proc = state.chunk.emit(Op::Jump(0));
+            let branch_make_proc = chunk.emit(Op::Jump(0));
 
-            state.begin_proc();
-            let start = state.bind(var);
-            state.bind(name);
-            compile_expr(proc_body, state)?;
-            state.chunk.emit(Op::Return);
-            let captures = state.end_proc();
+            let start = chunk.next_address();
+            state.begin_proc(name, var);
+            compile_expr(proc_body, chunk, state)?;
+            chunk.emit(Op::Return);
+            let captures = dbg!(state.end_proc());
 
-            let capture_ops: Vec<crate::op::Capture> = captures.captures
+            let capture_ops: Vec<crate::op::Capture> = captures
+                .captures
                 .iter()
                 .map(|c| {
                     if c.is_local {
@@ -228,29 +275,33 @@ fn compile_expr(expr: &Expr, state: &mut CompilerState) -> Result<(), String> {
                     }
                 })
                 .collect();
+            let make_proc_index = chunk.emit(Op::MakeProc(start, capture_ops));
+            state.push();
+            chunk.patch(branch_make_proc, make_proc_index);
 
-            let make_proc_index = state.chunk.emit(Op::MakeProc(start, capture_ops));
-            state.chunk.patch(branch_make_proc, make_proc_index);
-            state.bind(name);
-            compile_expr(let_body, state)?;
-            state.unbind()?;
+            state.begin_scope(name);
+            compile_expr(let_body, chunk, state)?;
+            state.end_scope();
         }
 
         Expr::Minus(e) => {
-            compile_expr(e, state)?;
-            state.chunk.emit(Op::Minus);
+            compile_expr(e, chunk, state)?;
+            state.pop();
+            chunk.emit(Op::Minus);
+            state.push();
         }
 
         Expr::Proc(var, body) => {
-            let branch_make_proc = state.chunk.emit(Op::Jump(0));
-            state.begin_proc();
-            let start = state.bind(var);
-            state.chunk.emit(Op::Pop);
-            compile_expr(body, state)?;
-            state.chunk.emit(Op::Return);
+            let branch_make_proc = chunk.emit(Op::Jump(0));
+
+            let start = chunk.next_address();
+            state.begin_proc("", var);
+            compile_expr(body, chunk, state)?;
+            chunk.emit(Op::Return);
             let captures = state.end_proc();
 
-            let capture_ops: Vec<crate::op::Capture> = captures.captures
+            let capture_ops: Vec<crate::op::Capture> = captures
+                .captures
                 .iter()
                 .map(|c| {
                     if c.is_local {
@@ -260,15 +311,21 @@ fn compile_expr(expr: &Expr, state: &mut CompilerState) -> Result<(), String> {
                     }
                 })
                 .collect();
-            let make_proc_index = state.chunk.emit(Op::MakeProc(start, capture_ops));
-            state.chunk.patch(branch_make_proc, make_proc_index);
+            let make_proc_index = chunk.emit(Op::MakeProc(start, capture_ops));
+            state.push();
+            chunk.patch(branch_make_proc, make_proc_index);
         }
 
         Expr::Var(var) => {
-            match state.lookup(var) {
-                Some(op) => state.chunk.emit(op),
-                None => return Err(format!("undefined name: {}", var)),
-            };
+            if let Some(stack_index) = state.lookup_local(var) {
+                chunk.emit(Op::PushLocal(stack_index));
+                state.push();
+            } else if let Some(capture_index) = state.lookup_capture(var) {
+                chunk.emit(Op::PushCapture(capture_index));
+                state.push();
+            } else {
+                return Err(format!("undefined name: {}", var));
+            }
         }
     }
 

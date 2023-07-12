@@ -1,19 +1,15 @@
-use crate::binding::Scope;
 use crate::chunk::Address;
 use crate::value::Value;
 
 #[derive(Debug)]
 pub enum Capture {
-    Local(Scope),
+    Local(usize),
     Capture(usize),
 }
 
 /// Represents a VM operation.
 #[derive(Debug)]
 pub enum Op {
-    /// Pops the stack and creates a new environment binding.
-    Bind,
-
     /// Call a procedure. Call expects two values at the on the stack: at the
     /// top an argument and next a procedure. Save he current op index and
     /// environment to the call stack, then set the instruction index and
@@ -43,13 +39,10 @@ pub enum Op {
     /// Pop a number from the stack and push its negative onto the stack.
     Minus,
 
-    /// Pop a value from the stack and discard it.
-    Pop,
-
     PushCapture(usize),
 
     /// Pushes a environment binding onto the stack.
-    PushLocal(Scope),
+    PushLocal(usize),
 
     /// Push a value onto the stack.
     PushValue(Value),

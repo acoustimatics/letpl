@@ -1,17 +1,15 @@
 use std::fmt;
 
-pub type Scope = usize;
-
 #[derive(Clone)]
 struct Binding {
     name: String,
-    scope: Scope,
+    stack_index: usize,
 }
 
 impl Binding {
-    fn new(name: &str, scope: Scope) -> Self {
+    fn new(name: &str, stack_index: usize) -> Self {
         let name = name.to_owned();
-        Binding { name, scope }
+        Self { name, stack_index }
     }
 }
 
@@ -26,25 +24,21 @@ impl BindingTable {
         Self { bindings }
     }
 
-    pub fn push(&mut self, name: &str) {
-        let scope = self.bindings.len();
-        let binding = Binding::new(name, scope);
+    pub fn push(&mut self, name: &str, stack_index: usize) {
+        let binding = Binding::new(name, stack_index);
         self.bindings.push(binding);
     }
 
-    pub fn pop(&mut self) -> Result<(), String> {
-        match self.bindings.pop() {
-            Some(_) => Ok(()),
-            None => Err("environment underflow".to_string()),
-        }
+    pub fn pop(&mut self) {
+        self.bindings.pop().expect("binding table underflow");
     }
 
-    pub fn lookup(&self, lookup_name: &str) -> Option<&Scope> {
+    pub fn lookup(&self, lookup_name: &str) -> Option<usize> {
         self.bindings
             .iter()
             .rev()
             .find(|b| b.name == lookup_name)
-            .map(|b| &b.scope)
+            .map(|b| b.stack_index)
     }
 }
 
@@ -52,7 +46,7 @@ impl fmt::Debug for BindingTable {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{{ ")?;
         for binding in self.bindings.iter() {
-            write!(f, "{}#{} ", binding.name, binding.scope)?;
+            write!(f, "{}#{} ", binding.name, binding.stack_index)?;
         }
         write!(f, "}}")
     }
