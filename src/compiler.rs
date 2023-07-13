@@ -1,11 +1,59 @@
 use std::fmt;
 
-use crate::binding::BindingTable;
-use crate::chunk::Chunk;
-use crate::op::Op;
-use crate::parser::parse;
-use crate::syntax::{Expr, Program};
-use crate::value::Value;
+use crate::parser::{Expr, Program};
+use crate::runtime::{self, Op, Value};
+
+#[derive(Clone)]
+struct Binding {
+    name: String,
+    stack_index: usize,
+}
+
+impl Binding {
+    fn new(name: &str, stack_index: usize) -> Self {
+        let name = name.to_owned();
+        Self { name, stack_index }
+    }
+}
+
+#[derive(Clone)]
+struct BindingTable {
+    bindings: Vec<Binding>,
+}
+
+impl BindingTable {
+    fn new() -> Self {
+        let bindings = Vec::new();
+        Self { bindings }
+    }
+
+    fn push(&mut self, name: &str, stack_index: usize) {
+        let binding = Binding::new(name, stack_index);
+        self.bindings.push(binding);
+    }
+
+    fn pop(&mut self) {
+        self.bindings.pop().expect("binding table underflow");
+    }
+
+    fn lookup(&self, lookup_name: &str) -> Option<usize> {
+        self.bindings
+            .iter()
+            .rev()
+            .find(|b| b.name == lookup_name)
+            .map(|b| b.stack_index)
+    }
+}
+
+impl fmt::Debug for BindingTable {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{{ ")?;
+        for binding in self.bindings.iter() {
+            write!(f, "{}#{} ", binding.name, binding.stack_index)?;
+        }
+        write!(f, "}}")
+    }
+}
 
 #[derive(Debug)]
 struct Capture {
@@ -178,17 +226,53 @@ impl CompilerState {
     }
 }
 
-/// Parses and compiles a given source text into a chunk.
-pub fn compile(src: &str) -> Result<Chunk, String> {
-    let program = parse(src)?;
-    compile_program(&program)
+struct Chunk {
+    pub ops: Vec<Op>,
 }
 
-fn compile_program(program: &Program) -> Result<Chunk, String> {
+impl Chunk {
+    fn new() -> Self {
+        let ops = Vec::new();
+        Chunk { ops }
+    }
+
+    fn emit(&mut self, op: Op) -> usize {
+        self.ops.push(op);
+        self.ops.len() - 1
+    }
+
+    fn next_address(&self) -> usize {
+        self.ops.len()
+    }
+
+    fn patch(&mut self, patch_at: usize, target: usize) {
+        match &self.ops[patch_at] {
+            Op::Jump(_) => {
+                self.ops[patch_at] = Op::Jump(target);
+            }
+            Op::JumpTrue(_) => {
+                self.ops[patch_at] = Op::JumpTrue(target);
+            }
+            _ => (),
+        }
+    }
+}
+
+impl fmt::Debug for Chunk {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "*** chunk {} ops ***", self.ops.len())?;
+        for (address, op) in self.ops.iter().enumerate() {
+            writeln!(f, "{}\t{:?}", address, op)?;
+        }
+        Ok(())
+    }
+}
+
+pub fn compile(program: &Program) -> Result<Vec<Op>, String> {
     let mut chunk = Chunk::new();
     let mut state = CompilerState::new();
     compile_expr(&program.expr, &mut chunk, &mut state)?;
-    Ok(chunk)
+    Ok(chunk.ops)
 }
 
 fn compile_expr(expr: &Expr, chunk: &mut Chunk, state: &mut CompilerState) -> Result<(), String> {
@@ -262,16 +346,16 @@ fn compile_expr(expr: &Expr, chunk: &mut Chunk, state: &mut CompilerState) -> Re
             state.begin_proc(name, var);
             compile_expr(proc_body, chunk, state)?;
             chunk.emit(Op::Return);
-            let captures = dbg!(state.end_proc());
+            let captures = state.end_proc();
 
-            let capture_ops: Vec<crate::op::Capture> = captures
+            let capture_ops: Vec<runtime::Capture> = captures
                 .captures
                 .iter()
                 .map(|c| {
                     if c.is_local {
-                        crate::op::Capture::Local(c.index)
+                        runtime::Capture::Local(c.index)
                     } else {
-                        crate::op::Capture::Capture(c.index)
+                        runtime::Capture::Capture(c.index)
                     }
                 })
                 .collect();
@@ -300,14 +384,14 @@ fn compile_expr(expr: &Expr, chunk: &mut Chunk, state: &mut CompilerState) -> Re
             chunk.emit(Op::Return);
             let captures = state.end_proc();
 
-            let capture_ops: Vec<crate::op::Capture> = captures
+            let capture_ops: Vec<runtime::Capture> = captures
                 .captures
                 .iter()
                 .map(|c| {
                     if c.is_local {
-                        crate::op::Capture::Local(c.index)
+                        runtime::Capture::Local(c.index)
                     } else {
-                        crate::op::Capture::Capture(c.index)
+                        runtime::Capture::Capture(c.index)
                     }
                 })
                 .collect();
