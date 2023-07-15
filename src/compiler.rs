@@ -55,6 +55,13 @@ impl fmt::Debug for BindingTable {
     }
 }
 
+fn lookup(bindings: &Option<BindingTable>, lookup_name: &str) -> Option<usize> {
+    match bindings {
+        Some(bindings) => bindings.lookup(lookup_name),
+        None => None,
+    }
+}
+
 #[derive(Debug)]
 struct Capture {
     name: String,
@@ -122,14 +129,15 @@ impl fmt::Debug for CaptureTable {
 
 struct Frame {
     stack_top: usize,
-    locals: BindingTable,
+    locals: Option<BindingTable>,
     captures: CaptureTable,
 }
 
 struct CompilerState {
     stack_top: usize,
     save_stack: Vec<usize>,
-    locals: BindingTable,
+    globals: BindingTable,
+    locals: Option<BindingTable>,
     call_stack: Vec<Frame>,
 }
 
@@ -138,8 +146,16 @@ impl CompilerState {
         Self {
             stack_top: 0,
             save_stack: Vec::new(),
-            locals: BindingTable::new(),
+            globals: BindingTable::new(),
+            locals: None,
             call_stack: Vec::new(),
+        }
+    }
+
+    fn current_bindings(&mut self) -> &mut BindingTable {
+        match self.locals.as_mut() {
+            Some(locals) => locals,
+            None => &mut self.globals,
         }
     }
 
@@ -160,16 +176,17 @@ impl CompilerState {
     }
 
     fn begin_scope(&mut self, name: &str) {
-        self.locals.push(name, self.stack_top - 1);
+        let stack_index = self.stack_top - 1;
+        self.current_bindings().push(name, stack_index);
     }
 
     fn end_scope(&mut self) {
-        self.locals.pop()
+        self.current_bindings().pop()
     }
 
     fn begin_proc(&mut self, name: &str, var: &str) {
         let stack_top = std::mem::replace(&mut self.stack_top, 0);
-        let locals = std::mem::replace(&mut self.locals, BindingTable::new());
+        let locals = std::mem::replace(&mut self.locals, Some(BindingTable::new()));
         let frame = Frame {
             stack_top,
             locals,
@@ -192,7 +209,7 @@ impl CompilerState {
     }
 
     fn lookup_local(&mut self, lookup_name: &str) -> Option<usize> {
-        self.locals.lookup(lookup_name)
+        lookup(&self.locals, lookup_name)
     }
 
     fn lookup_capture(&mut self, lookup_name: &str) -> Option<usize> {
@@ -205,13 +222,11 @@ impl CompilerState {
     }
 
     fn capture(&mut self, lookup_name: &str, call_depth: usize) -> Option<usize> {
-        if let Some(stack_index) = self.call_stack[call_depth].locals.lookup(lookup_name) {
-            let capture_index = self.call_stack[call_depth]
-                .captures
-                .add_local_capture(lookup_name, stack_index);
+        let frame = &mut self.call_stack[call_depth];
+        if let Some(stack_index) = lookup(&frame.locals, lookup_name) {
+            let capture_index = frame.captures.add_local_capture(lookup_name, stack_index);
             Some(capture_index)
-        } else if let Some(capture_index) = self.call_stack[call_depth].captures.lookup(lookup_name)
-        {
+        } else if let Some(capture_index) = frame.captures.lookup(lookup_name) {
             Some(capture_index)
         } else if call_depth > 0 {
             self.capture(lookup_name, call_depth - 1)
@@ -406,6 +421,9 @@ fn compile_expr(expr: &Expr, chunk: &mut Chunk, state: &mut CompilerState) -> Re
                 state.push();
             } else if let Some(capture_index) = state.lookup_capture(var) {
                 chunk.emit(Op::PushCapture(capture_index));
+                state.push();
+            } else if let Some(stack_index) = state.globals.lookup(var) {
+                chunk.emit(Op::PushGlobal(stack_index));
                 state.push();
             } else {
                 return Err(format!("undefined name: {}", var));

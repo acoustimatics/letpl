@@ -107,6 +107,8 @@ pub enum Op {
 
     PushCapture(usize),
 
+    PushGlobal(usize),
+
     /// Pushes a environment binding onto the stack.
     PushLocal(usize),
 
@@ -215,6 +217,11 @@ pub fn run(program: &[Op]) -> Result<Value, String> {
 
             Op::PushCapture(capture_index) => {
                 let v = captures[*capture_index].clone();
+                stack.push(v);
+            }
+
+            Op::PushGlobal(stack_index) => {
+                let v = stack[*stack_index].clone();
                 stack.push(v);
             }
 
