@@ -1,16 +1,7 @@
-mod binding;
-mod chunk;
 mod compiler;
-mod op;
 mod parser;
-mod procedure;
-mod scanner;
-mod syntax;
-mod token;
-mod value;
-mod vm;
+mod runtime;
 
-use crate::value::Value;
 use std::error::Error;
 use std::io::Write;
 use std::{env, fs, io};
@@ -37,13 +28,13 @@ fn repl() -> ! {
     }
 }
 
-fn read_file_eval(path: &str) -> Result<Value, Box<dyn Error>> {
+fn read_file_eval(path: &str) -> Result<runtime::Value, Box<dyn Error>> {
     let src = fs::read_to_string(path)?;
     let value = eval(&src)?;
     Ok(value)
 }
 
-fn read_eval() -> Result<Value, Box<dyn Error>> {
+fn read_eval() -> Result<runtime::Value, Box<dyn Error>> {
     let src = read()?;
     let value = eval(&src)?;
     Ok(value)
@@ -57,13 +48,14 @@ fn read() -> Result<String, Box<dyn Error>> {
     Ok(buffer)
 }
 
-fn eval(src: &str) -> Result<Value, Box<dyn Error>> {
-    let chunk = compiler::compile(src)?;
-    let value = vm::run(&chunk)?;
+fn eval(src: &str) -> Result<runtime::Value, Box<dyn Error>> {
+    let program = parser::parse(src)?;
+    let compiled_program = compiler::compile(&program)?;
+    let value = runtime::run(&compiled_program)?;
     Ok(value)
 }
 
-fn print(result: Result<Value, Box<dyn Error>>) {
+fn print(result: Result<runtime::Value, Box<dyn Error>>) {
     match result {
         Ok(value) => println!("{}", value),
         Err(e) => eprintln!("error: {}", e),
