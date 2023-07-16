@@ -16,6 +16,7 @@ letpl's grammar is:
                ::= "proc" "(" Identifier ")" Expression
                ::= "(" Expression Expression ")"
                ::= letrec Identifier "(" Identifier ")" Expression "in" Expression
+               ::= "print" "(" Expression ")"
 
 Numbers are 64 bit floating point values.
 
@@ -32,3 +33,5 @@ An identifier evaluates to the value bound to it. All identifiers are lexically 
 `let` binds an identifier to a value of the expression after `=`, and then evaluates the expression after `in`. An identfier may be a letter followed by letters and/or digits.
 
 `proc` creates a procedure object of one variable. `letrec` creates and binds to a name a procedure which can recursively call itself. All procedures are closures. `(f x)` calls the procedure `f` with the argument `x`.
+
+`print` prints with a newline the value of its inner expression which it also evaluates to.
