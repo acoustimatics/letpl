@@ -28,16 +28,16 @@ fn repl() -> ! {
     }
 }
 
-fn read_file_eval(path: &str) -> Result<runtime::Value, Box<dyn Error>> {
+fn read_file_eval(path: &str) -> Result<(), Box<dyn Error>> {
     let src = fs::read_to_string(path)?;
-    let value = eval(&src)?;
-    Ok(value)
+    eval(&src)?;
+    Ok(())
 }
 
-fn read_eval() -> Result<runtime::Value, Box<dyn Error>> {
+fn read_eval() -> Result<(), Box<dyn Error>> {
     let src = read()?;
-    let value = eval(&src)?;
-    Ok(value)
+    eval(&src)?;
+    Ok(())
 }
 
 fn read() -> Result<String, Box<dyn Error>> {
@@ -48,16 +48,16 @@ fn read() -> Result<String, Box<dyn Error>> {
     Ok(buffer)
 }
 
-fn eval(src: &str) -> Result<runtime::Value, Box<dyn Error>> {
+fn eval(src: &str) -> Result<(), Box<dyn Error>> {
     let program = parser::parse(src)?;
     let compiled_program = compiler::compile(&program)?;
-    let value = runtime::run(&compiled_program)?;
-    Ok(value)
+    runtime::run(&compiled_program)?;
+    Ok(())
 }
 
-fn print(result: Result<runtime::Value, Box<dyn Error>>) {
+fn print(result: Result<(), Box<dyn Error>>) {
     match result {
-        Ok(value) => println!("{}", value),
+        Ok(_) => println!("ok"),
         Err(e) => eprintln!("error: {}", e),
     }
 }

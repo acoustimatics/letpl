@@ -105,6 +105,8 @@ pub enum Op {
     /// Pop a number from the stack and push its negative onto the stack.
     Minus,
 
+    Print,
+
     PushCapture(usize),
 
     PushGlobal(usize),
@@ -119,6 +121,8 @@ pub enum Op {
     /// stack. For the return value, the procedure's code must have left one
     /// value on the stack.
     Return,
+
+    TailCall,
 }
 
 struct Frame {
@@ -149,7 +153,7 @@ macro_rules! pop_number {
     };
 }
 
-pub fn run(program: &[Op]) -> Result<Value, String> {
+pub fn run(program: &[Op]) -> Result<(), String> {
     let mut stack = Vec::<Value>::new();
     let mut call_stack = Vec::<Frame>::new();
 
@@ -157,6 +161,7 @@ pub fn run(program: &[Op]) -> Result<Value, String> {
     let mut frame_stack_index = 0;
     let mut captures = Rc::new(Vec::<Value>::new());
 
+    println!();
     while next_op < program.len() {
         let op = &program[next_op];
         next_op += 1;
@@ -215,6 +220,11 @@ pub fn run(program: &[Op]) -> Result<Value, String> {
                 stack.push(v);
             }
 
+            Op::Print => {
+                let v = &stack[stack.len() - 1];
+                println!("{}", v);
+            }
+
             Op::PushCapture(capture_index) => {
                 let v = captures[*capture_index].clone();
                 stack.push(v);
@@ -246,8 +256,30 @@ pub fn run(program: &[Op]) -> Result<Value, String> {
                 frame_stack_index = frame.stack_index;
                 captures = frame.captures;
             }
+
+            Op::TailCall => {
+                let argument = pop!(stack);
+                let proc = pop!(stack);
+
+                // Cleanup stack frame.
+                for _ in frame_stack_index..stack.len() {
+                    pop!(stack);
+                }
+
+                // Set up a jump to procedure.
+                {
+                    let p = proc.as_proc()?;
+                    next_op = p.start;
+                    captures = Rc::clone(&p.captures);
+                }
+
+                // Setup stack so it looks like the proc was called instead of
+                // jumped to.
+                stack.push(proc);
+                stack.push(argument);
+            }
         }
     }
 
-    Ok(pop!(stack))
+    Ok(())
 }

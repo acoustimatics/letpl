@@ -27,6 +27,8 @@ pub enum Expr {
     /// Represent an let/in expression.
     Let(String, Box<Expr>, Box<Expr>),
 
+    Print(Box<Expr>),
+
     /// Represents a numerical negation.
     Minus(Box<Expr>),
 
@@ -58,6 +60,7 @@ enum Token {
     LeftParen,
     Let,
     LetRec,
+    Print,
     Proc,
     Minus,
     MinusSign,
@@ -82,6 +85,7 @@ impl fmt::Display for Token {
             Token::LeftParen => "(",
             Token::Let => "let",
             Token::LetRec => "letrec",
+            Token::Print => "print",
             Token::Proc => "proc",
             Token::Minus => "minus",
             Token::MinusSign => "-",
@@ -149,6 +153,7 @@ impl<'a> Scanner<'a> {
                 "in" => In,
                 "let" => Let,
                 "letrec" => LetRec,
+                "print" => Print,
                 "proc" => Proc,
                 "minus" => Minus,
                 "then" => Then,
@@ -296,6 +301,7 @@ impl<'a> Parser<'a> {
             }
             Token::Let => self.let_expr(),
             Token::LetRec => self.let_rec_expr(),
+            Token::Print => self.print_expr(),
             Token::Proc => self.proc_expr(),
             Token::LeftParen => self.call_expr(),
             unexpected_token => Err(format!("unexpected token `{:}`", unexpected_token)),
@@ -370,6 +376,15 @@ impl<'a> Parser<'a> {
             proc_body,
             let_body,
         }))
+    }
+
+    fn print_expr(&mut self) -> ExprResult {
+        self.advance()?;
+        self.expect(Token::LeftParen)?;
+        let expr = self.expr()?;
+        self.expect(Token::RightParen)?;
+
+        Ok(Box::new(Expr::Print(expr)))
     }
 
     fn proc_expr(&mut self) -> ExprResult {

@@ -152,6 +152,10 @@ impl CompilerState {
         }
     }
 
+    fn call_depth(&self) -> usize {
+        self.call_stack.len()
+    }
+
     fn current_bindings(&mut self) -> &mut BindingTable {
         match self.locals.as_mut() {
             Some(locals) => locals,
@@ -283,21 +287,31 @@ impl fmt::Debug for Chunk {
     }
 }
 
+#[derive(PartialEq)]
+enum ExprPos {
+    Operand,
+    Tail,
+}
+
 pub fn compile(program: &Program) -> Result<Vec<Op>, String> {
     let mut chunk = Chunk::new();
     let mut state = CompilerState::new();
-    compile_expr(&program.expr, &mut chunk, &mut state)?;
+    compile_expr(&program.expr, ExprPos::Tail, &mut chunk, &mut state)?;
     Ok(chunk.ops)
 }
 
-fn compile_expr(expr: &Expr, chunk: &mut Chunk, state: &mut CompilerState) -> Result<(), String> {
+fn compile_expr(expr: &Expr, expr_pos: ExprPos, chunk: &mut Chunk, state: &mut CompilerState) -> Result<(), String> {
     match expr {
         Expr::Call(proc, arg) => {
-            compile_expr(proc, chunk, state)?;
-            compile_expr(arg, chunk, state)?;
+            compile_expr(proc, ExprPos::Operand,  chunk, state)?;
+            compile_expr(arg, ExprPos::Operand, chunk, state)?;
             state.pop();
             state.pop();
-            chunk.emit(Op::Call);
+            if expr_pos == ExprPos::Tail && state.call_depth() > 0 {
+                chunk.emit(Op::TailCall);
+            } else {
+                chunk.emit(Op::Call);
+            }
             state.push();
         }
 
@@ -308,8 +322,8 @@ fn compile_expr(expr: &Expr, chunk: &mut Chunk, state: &mut CompilerState) -> Re
         }
 
         Expr::Diff(e1, e2) => {
-            compile_expr(e1, chunk, state)?;
-            compile_expr(e2, chunk, state)?;
+            compile_expr(e1, ExprPos::Operand, chunk, state)?;
+            compile_expr(e2, ExprPos::Operand, chunk, state)?;
             state.pop();
             state.pop();
             chunk.emit(Op::Diff);
@@ -317,35 +331,35 @@ fn compile_expr(expr: &Expr, chunk: &mut Chunk, state: &mut CompilerState) -> Re
         }
 
         Expr::If(guard, consq, alt) => {
-            compile_expr(guard, chunk, state)?;
+            compile_expr(guard, ExprPos::Operand, chunk, state)?;
             state.pop();
             let branch_to_consq = chunk.emit(Op::JumpTrue(0));
 
             state.save_stack();
 
-            compile_expr(alt, chunk, state)?;
+            compile_expr(alt, ExprPos::Tail, chunk, state)?;
             let branch_to_end = chunk.emit(Op::Jump(0));
 
             state.restore_stack();
 
             let consq_start = chunk.next_address();
-            compile_expr(consq, chunk, state)?;
+            compile_expr(consq, ExprPos::Tail, chunk, state)?;
             let if_end = chunk.next_address();
             chunk.patch(branch_to_consq, consq_start);
             chunk.patch(branch_to_end, if_end);
         }
 
         Expr::IsZero(e) => {
-            compile_expr(e, chunk, state)?;
+            compile_expr(e, ExprPos::Operand, chunk, state)?;
             state.pop();
             chunk.emit(Op::IsZero);
             state.push();
         }
 
         Expr::Let(var, e1, e2) => {
-            compile_expr(e1, chunk, state)?;
+            compile_expr(e1, ExprPos::Operand, chunk, state)?;
             state.begin_scope(var);
-            compile_expr(e2, chunk, state)?;
+            compile_expr(e2, ExprPos::Tail, chunk, state)?;
             state.end_scope();
         }
 
@@ -359,7 +373,7 @@ fn compile_expr(expr: &Expr, chunk: &mut Chunk, state: &mut CompilerState) -> Re
 
             let start = chunk.next_address();
             state.begin_proc(name, var);
-            compile_expr(proc_body, chunk, state)?;
+            compile_expr(proc_body, ExprPos::Tail, chunk, state)?;
             chunk.emit(Op::Return);
             let captures = state.end_proc();
 
@@ -379,15 +393,20 @@ fn compile_expr(expr: &Expr, chunk: &mut Chunk, state: &mut CompilerState) -> Re
             chunk.patch(branch_make_proc, make_proc_index);
 
             state.begin_scope(name);
-            compile_expr(let_body, chunk, state)?;
+            compile_expr(let_body, ExprPos::Tail, chunk, state)?;
             state.end_scope();
         }
 
         Expr::Minus(e) => {
-            compile_expr(e, chunk, state)?;
+            compile_expr(e, ExprPos::Operand, chunk, state)?;
             state.pop();
             chunk.emit(Op::Minus);
             state.push();
+        }
+
+        Expr::Print(e) => {
+            compile_expr(e, ExprPos::Operand, chunk, state)?;
+            chunk.emit(Op::Print);
         }
 
         Expr::Proc(var, body) => {
@@ -395,7 +414,7 @@ fn compile_expr(expr: &Expr, chunk: &mut Chunk, state: &mut CompilerState) -> Re
 
             let start = chunk.next_address();
             state.begin_proc("", var);
-            compile_expr(body, chunk, state)?;
+            compile_expr(body, ExprPos::Tail, chunk, state)?;
             chunk.emit(Op::Return);
             let captures = state.end_proc();
 
