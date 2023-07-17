@@ -29,9 +29,6 @@ pub enum Expr {
 
     Print(Box<Expr>),
 
-    /// Represents a numerical negation.
-    Minus(Box<Expr>),
-
     /// Represents a procedure.
     Proc(String, Box<Expr>),
 
@@ -62,7 +59,6 @@ enum Token {
     LetRec,
     Print,
     Proc,
-    Minus,
     MinusSign,
     Number(f64),
     RightParen,
@@ -87,7 +83,6 @@ impl fmt::Display for Token {
             Token::LetRec => "letrec",
             Token::Print => "print",
             Token::Proc => "proc",
-            Token::Minus => "minus",
             Token::MinusSign => "-",
             Token::Number(_) => "number",
             Token::RightParen => ")",
@@ -155,7 +150,6 @@ impl<'a> Scanner<'a> {
                 "letrec" => LetRec,
                 "print" => Print,
                 "proc" => Proc,
-                "minus" => Minus,
                 "then" => Then,
                 "zero?" => IsZero,
                 _ => Identifier(s),
@@ -291,7 +285,6 @@ impl<'a> Parser<'a> {
                 Ok(Box::new(Expr::Const(x)))
             }
             Token::MinusSign => self.diff(),
-            Token::Minus => self.minus(),
             Token::IsZero => self.is_zero(),
             Token::If => self.if_expr(),
             Token::Identifier(var) => {
@@ -317,15 +310,6 @@ impl<'a> Parser<'a> {
         self.expect(Token::RightParen)?;
 
         Ok(Box::new(Expr::Diff(left_expr, right_expr)))
-    }
-
-    fn minus(&mut self) -> ExprResult {
-        self.advance()?;
-        self.expect(Token::LeftParen)?;
-        let expr = self.expr()?;
-        self.expect(Token::RightParen)?;
-
-        Ok(Box::new(Expr::Minus(expr)))
     }
 
     fn is_zero(&mut self) -> ExprResult {

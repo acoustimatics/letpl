@@ -102,9 +102,6 @@ pub enum Op {
     /// procedure onto the stack.
     MakeProc(usize, Vec<Capture>),
 
-    /// Pop a number from the stack and push its negative onto the stack.
-    Minus,
-
     Print,
 
     PushCapture(usize),
@@ -212,12 +209,6 @@ pub fn run(program: &[Op]) -> Result<(), String> {
                 let proc = Rc::new(proc);
                 let value = Value::Procedure(proc);
                 stack.push(value);
-            }
-
-            Op::Minus => {
-                let x = pop_number!(stack)?;
-                let v = Value::Number(-x);
-                stack.push(v);
             }
 
             Op::Print => {

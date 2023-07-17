@@ -1,6 +1,8 @@
 mod compiler;
+mod name_analysis;
 mod parser;
 mod runtime;
+mod util;
 
 use std::error::Error;
 use std::io::Write;
@@ -50,7 +52,8 @@ fn read() -> Result<String, Box<dyn Error>> {
 
 fn eval(src: &str) -> Result<(), Box<dyn Error>> {
     let program = parser::parse(src)?;
-    let compiled_program = compiler::compile(&program)?;
+    let nameless_program = name_analysis::resolve_names(&program)?;
+    let compiled_program = compiler::compile(&nameless_program)?;
     runtime::run(&compiled_program)?;
     Ok(())
 }
