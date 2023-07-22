@@ -115,17 +115,28 @@ impl<'a> Scanner<'a> {
         self.current = self.chars.next();
     }
 
+    fn skip_whitespace_comments(&mut self) {
+        let mut in_comment = false;
+        while let Some(c) = self.current {
+            if c == '#' {
+                in_comment = true;
+                self.advance();
+            } else if c == '\n' && in_comment {
+                in_comment = false;
+                self.advance();
+            } else if is_whitespace(c) || in_comment {
+                self.advance();
+            } else {
+                break;
+            }
+        }
+    }
+
     /// Attempt to get the next token in the source text.
     fn next_token(&mut self) -> Result<Token, String> {
         use Token::*;
 
-        // Skip whitespace.
-        loop {
-            match self.current {
-                Some(c) if is_whitespace(c) => self.advance(),
-                _ => break,
-            }
-        }
+        self.skip_whitespace_comments();
 
         // Handle end of code.
         if self.current.is_none() {

@@ -18,6 +18,8 @@ letpl's grammar is:
                ::= letrec Identifier "(" Identifier ")" Expression "in" Expression
                ::= "print" "(" Expression ")"
 
+Comments start with `#` and end at a line feed.
+
 Numbers are 64 bit floating point values.
 
 `-(x, y)`, where `x` and `y` are numbers, evaluates to `x - y`.
