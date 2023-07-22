@@ -1,7 +1,6 @@
 use std::fmt;
 
 use crate::parser;
-use crate::util::ok_box;
 
 pub struct Program {
     pub expr: Box<Expr>,
@@ -288,12 +287,12 @@ fn resolve_names_expr(expr: &parser::Expr, state: &mut CompilerState) -> Result<
             state.pop();
             state.pop();
             state.push();
-            ok_box(Expr::Call(proc, arg))
+            Ok(Box::new(Expr::Call(proc, arg)))
         }
 
         parser::Expr::Const(x) => {
             state.push();
-            ok_box(Expr::Const(*x))
+            Ok(Box::new(Expr::Const(*x)))
         }
 
         parser::Expr::Diff(lhs, rhs) => {
@@ -302,7 +301,7 @@ fn resolve_names_expr(expr: &parser::Expr, state: &mut CompilerState) -> Result<
             state.pop();
             state.pop();
             state.push();
-            ok_box(Expr::Diff(lhs, rhs))
+            Ok(Box::new(Expr::Diff(lhs, rhs)))
         }
 
         parser::Expr::If(guard, consq, alt) => {
@@ -312,14 +311,14 @@ fn resolve_names_expr(expr: &parser::Expr, state: &mut CompilerState) -> Result<
             let alt = resolve_names_expr(alt, state)?;
             state.restore_stack();
             let consq = resolve_names_expr(consq, state)?;
-            ok_box(Expr::If(guard, consq, alt))
+            Ok(Box::new(Expr::If(guard, consq, alt)))
         }
 
         parser::Expr::IsZero(e) => {
             let e = resolve_names_expr(e, state)?;
             state.pop();
             state.push();
-            ok_box(Expr::IsZero(e))
+            Ok(Box::new(Expr::IsZero(e)))
         }
 
         parser::Expr::Let(var, rhs, body) => {
@@ -327,7 +326,7 @@ fn resolve_names_expr(expr: &parser::Expr, state: &mut CompilerState) -> Result<
             state.begin_scope(var);
             let body = resolve_names_expr(body, state)?;
             state.end_scope();
-            ok_box(Expr::Let(rhs, body))
+            Ok(Box::new(Expr::Let(rhs, body)))
         }
 
         parser::Expr::LetRec {
@@ -340,12 +339,12 @@ fn resolve_names_expr(expr: &parser::Expr, state: &mut CompilerState) -> Result<
             state.begin_scope(name);
             let let_body = resolve_names_expr(let_body, state)?;
             state.end_scope();
-            ok_box(Expr::Let(proc, let_body))
+            Ok(Box::new(Expr::Let(proc, let_body)))
         }
 
         parser::Expr::Print(e) => {
             let e = resolve_names_expr(e, state)?;
-            ok_box(Expr::Print(e))
+            Ok(Box::new(Expr::Print(e)))
         }
 
         parser::Expr::Proc(var, body) => resolve_names_proc("", var, body, state),
@@ -353,13 +352,13 @@ fn resolve_names_expr(expr: &parser::Expr, state: &mut CompilerState) -> Result<
         parser::Expr::Var(var) => {
             if let Some(stack_index) = state.lookup_local(var) {
                 state.push();
-                ok_box(Expr::Local(stack_index))
+                Ok(Box::new(Expr::Local(stack_index)))
             } else if let Some(capture_index) = state.lookup_capture(var) {
                 state.push();
-                ok_box(Expr::Capture(capture_index))
+                Ok(Box::new(Expr::Capture(capture_index)))
             } else if let Some(stack_index) = state.globals.lookup(var) {
                 state.push();
-                ok_box(Expr::Global(stack_index))
+                Ok(Box::new(Expr::Global(stack_index)))
             } else {
                 Err(format!("undefined name: {}", var))
             }
@@ -388,5 +387,5 @@ fn resolve_names_proc(
         })
         .collect();
     state.push();
-    ok_box(Expr::Proc(body, captures))
+    Ok(Box::new(Expr::Proc(body, captures)))
 }

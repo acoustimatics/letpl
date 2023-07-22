@@ -2,7 +2,6 @@ mod compiler;
 mod name_analysis;
 mod parser;
 mod runtime;
-mod util;
 
 use std::error::Error;
 use std::io::Write;
