@@ -158,7 +158,6 @@ pub fn run(program: &[Op]) -> Result<(), String> {
     let mut frame_stack_index = 0;
     let mut captures = Rc::new(Vec::<Value>::new());
 
-    println!();
     while next_op < program.len() {
         let op = &program[next_op];
         next_op += 1;
