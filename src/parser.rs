@@ -1,6 +1,33 @@
 use std::fmt;
 use std::str::Chars;
 
+pub struct LetType {
+    let_type: Box<TypeTag>,
+}
+
+impl LetType {
+    fn new_int() -> Self {
+        let let_type = Box::new(TypeTag::Int);
+        Self { let_type }
+    }
+
+    fn new_bool() -> Self {
+        let let_type = Box::new(TypeTag::Bool);
+        Self { let_type }
+    }
+
+    fn new_proc(var_type: LetType, result_type: LetType) -> Self {
+        let let_type = Box::new(TypeTag::Proc(var_type, result_type));
+        Self { let_type }
+    }
+}
+
+pub enum TypeTag {
+    Int,
+    Bool,
+    Proc(LetType, LetType),
+}
+
 /// Represents a Program node in an AST.
 pub struct Program {
     pub expr: Box<Expr>,
@@ -30,15 +57,17 @@ pub enum Expr {
     Print(Box<Expr>),
 
     /// Represents a procedure.
-    Proc(String, Box<Expr>),
+    Proc(String, LetType, Box<Expr>),
 
     /// Represents a procedure call.
     Call(Box<Expr>, Box<Expr>),
 
     /// Represents a recursve procedure.
     LetRec {
+        result_type: LetType,
         name: String,
         var: String,
+        var_type: LetType,
         proc_body: Box<Expr>,
         let_body: Box<Expr>,
     },
@@ -47,6 +76,9 @@ pub enum Expr {
 /// Represents a token in a source text.
 #[derive(PartialEq)]
 enum Token {
+    Arrow,
+    Bool,
+    Colon,
     Comma,
     Else,
     Eof,
@@ -54,6 +86,7 @@ enum Token {
     Identifier(String),
     If,
     In,
+    Int,
     LeftParen,
     Let,
     LetRec,
@@ -69,6 +102,9 @@ enum Token {
 impl fmt::Display for Token {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let token_str = match self {
+            Token::Arrow => "->",
+            Token::Bool => "bool",
+            Token::Colon => ":",
             Token::Comma => ",",
             Token::Else => "else",
             Token::Eof => "EOF",
@@ -78,6 +114,7 @@ impl fmt::Display for Token {
             }
             Token::If => "if",
             Token::In => "in",
+            Token::Int => "int",
             Token::LeftParen => "(",
             Token::Let => "let",
             Token::LetRec => "letrec",
@@ -154,9 +191,11 @@ impl<'a> Scanner<'a> {
             }
 
             let token = match s.as_ref() {
+                "bool" => Bool,
                 "else" => Else,
                 "if" => If,
                 "in" => In,
+                "int" => Int,
                 "let" => Let,
                 "letrec" => LetRec,
                 "print" => Print,
@@ -178,6 +217,7 @@ impl<'a> Scanner<'a> {
         let token = match self.current.unwrap() {
             '(' => LeftParen,
             ')' => RightParen,
+            ':' => Colon,
             ',' => Comma,
             '-' => MinusSign,
             '=' => Equal,
@@ -186,6 +226,15 @@ impl<'a> Scanner<'a> {
 
         // Advance past the last character in the operator.
         self.advance();
+
+        // Check for two character operators.
+        let token = match self.current {
+            Some('>') if token == Token::MinusSign => {
+                self.advance();
+                Token::Arrow
+            }
+            _ => token,
+        };
 
         Ok(token)
     }
@@ -359,15 +408,21 @@ impl<'a> Parser<'a> {
         let name = self.expect_identifer()?;
         self.expect(Token::LeftParen)?;
         let var = self.expect_identifer()?;
+        self.expect(Token::Colon)?;
+        let var_type = self.parse_type()?;
         self.expect(Token::RightParen)?;
+        self.expect(Token::Arrow)?;
+        let result_type = self.parse_type()?;
         self.expect(Token::Equal)?;
         let proc_body = self.expr()?;
         self.expect(Token::In)?;
         let let_body = self.expr()?;
 
         Ok(Box::new(Expr::LetRec {
+            result_type,
             name,
             var,
+            var_type,
             proc_body,
             let_body,
         }))
@@ -386,10 +441,12 @@ impl<'a> Parser<'a> {
         self.advance()?;
         self.expect(Token::LeftParen)?;
         let var = self.expect_identifer()?;
+        self.expect(Token::Colon)?;
+        let ty = self.parse_type()?;
         self.expect(Token::RightParen)?;
         let body = self.expr()?;
 
-        Ok(Box::new(Expr::Proc(var, body)))
+        Ok(Box::new(Expr::Proc(var, ty, body)))
     }
 
     fn call_expr(&mut self) -> ExprResult {
@@ -399,5 +456,27 @@ impl<'a> Parser<'a> {
         self.expect(Token::RightParen)?;
 
         Ok(Box::new(Expr::Call(operator, operand)))
+    }
+
+    fn parse_type(&mut self) -> Result<LetType, String> {
+        match self.current {
+            Token::Int =>  {
+                self.advance()?;
+                Ok(LetType::new_int())
+            }
+            Token::Bool => {
+                self.advance()?;
+                Ok(LetType::new_bool())
+            }
+            Token::LeftParen => {
+                self.advance()?;
+                let var_type = self.parse_type()?;
+                self.expect(Token::Arrow)?;
+                let result_type = self.parse_type()?;
+                self.expect(Token::RightParen)?;
+                Ok(LetType::new_proc(var_type, result_type))
+            }
+            _ => Err(format!("unexpected token `{}`", self.current)),
+        }
     }
 }

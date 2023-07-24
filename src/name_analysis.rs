@@ -334,6 +334,7 @@ fn resolve_names_expr(expr: &parser::Expr, state: &mut CompilerState) -> Result<
             var,
             proc_body,
             let_body,
+            ..
         } => {
             let proc = resolve_names_proc(name, var, proc_body, state)?;
             state.begin_scope(name);
@@ -347,7 +348,7 @@ fn resolve_names_expr(expr: &parser::Expr, state: &mut CompilerState) -> Result<
             Ok(Box::new(Expr::Print(e)))
         }
 
-        parser::Expr::Proc(var, body) => resolve_names_proc("", var, body, state),
+        parser::Expr::Proc(var, _, body) => resolve_names_proc("", var, body, state),
 
         parser::Expr::Var(var) => {
             if let Some(stack_index) = state.lookup_local(var) {
