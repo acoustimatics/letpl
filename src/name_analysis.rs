@@ -11,7 +11,7 @@ pub enum Expr {
 
     Capture(usize),
 
-    Const(f64),
+    Const(i64),
 
     Diff(Box<Expr>, Box<Expr>),
 

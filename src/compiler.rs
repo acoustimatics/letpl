@@ -47,7 +47,7 @@ fn compile_expr(
         }
 
         Expr::Const(x) => {
-            let v = Value::Number(*x);
+            let v = Value::Integer(*x);
             chunk.emit(Op::PushValue(v));
         }
 

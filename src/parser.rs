@@ -1,24 +1,58 @@
 use std::fmt;
+use std::rc::Rc;
 use std::str::Chars;
 
 pub struct LetType {
-    let_type: Box<TypeTag>,
+    let_type: Rc<TypeTag>,
 }
 
 impl LetType {
-    fn new_int() -> Self {
-        let let_type = Box::new(TypeTag::Int);
+    pub fn new_int() -> Self {
+        let let_type = Rc::new(TypeTag::Int);
         Self { let_type }
     }
 
-    fn new_bool() -> Self {
-        let let_type = Box::new(TypeTag::Bool);
+    pub fn new_bool() -> Self {
+        let let_type = Rc::new(TypeTag::Bool);
         Self { let_type }
     }
 
-    fn new_proc(var_type: LetType, result_type: LetType) -> Self {
-        let let_type = Box::new(TypeTag::Proc(var_type, result_type));
+    pub fn new_proc(var_type: LetType, result_type: LetType) -> Self {
+        let let_type = Rc::new(TypeTag::Proc(var_type, result_type));
         Self { let_type }
+    }
+
+    pub fn is_int(&self) -> bool {
+        match self.let_type.as_ref() {
+            TypeTag::Int => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_bool(&self) -> bool {
+        match self.let_type.as_ref() {
+            TypeTag::Bool => true,
+            _ => false,
+        }
+    }
+}
+
+impl PartialEq for LetType {
+    fn eq(&self, other: &Self) -> bool {
+        self.let_type.as_ref() == other.let_type.as_ref()
+    }
+}
+
+impl Clone for LetType {
+    fn clone(&self) -> Self {
+        let let_type = Rc::clone(&self.let_type);
+        Self { let_type }
+    }
+}
+
+impl fmt::Display for LetType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.let_type)
     }
 }
 
@@ -26,6 +60,29 @@ pub enum TypeTag {
     Int,
     Bool,
     Proc(LetType, LetType),
+}
+
+impl PartialEq for TypeTag {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (TypeTag::Int, TypeTag::Int) => true,
+            (TypeTag::Bool, TypeTag::Bool) => true,
+            (TypeTag::Proc(v1, r1), TypeTag::Proc(v2, r2)) => {
+                v1 == v2 && r1 == r2
+            }
+            _ => false,
+        }
+    }
+}
+
+impl fmt::Display for TypeTag {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            TypeTag::Int => write!(f, "int"),
+            TypeTag::Bool => write!(f, "bool"),
+            TypeTag::Proc(var, result) => write!(f, "({} -> {})", var, result),
+        }
+    }
 }
 
 /// Represents a Program node in an AST.
@@ -36,7 +93,7 @@ pub struct Program {
 /// Represents an Expression node in an AST.
 pub enum Expr {
     /// Represents a constant numerical expression.
-    Const(f64),
+    Const(i64),
 
     /// Represents an expression that takes the difference of two
     /// sub-expressions.
@@ -93,7 +150,7 @@ enum Token {
     Print,
     Proc,
     MinusSign,
-    Number(f64),
+    Number(i64),
     RightParen,
     Then,
     IsZero,
@@ -244,21 +301,6 @@ impl<'a> Scanner<'a> {
 
         while self.current.map_or(false, is_digit) {
             self.collect(&mut s);
-        }
-
-        if self.current.map_or(false, |c| c == '.') {
-            self.collect(&mut s);
-
-            match self.current {
-                Some(c) if is_digit(c) => self.collect(&mut s),
-                _ => {
-                    return Err(String::from("expected digit after decimal point"));
-                }
-            }
-
-            while self.current.map_or(false, is_digit) {
-                self.collect(&mut s)
-            }
         }
 
         match s.parse() {
