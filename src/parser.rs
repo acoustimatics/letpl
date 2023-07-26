@@ -67,9 +67,7 @@ impl PartialEq for TypeTag {
         match (self, other) {
             (TypeTag::Int, TypeTag::Int) => true,
             (TypeTag::Bool, TypeTag::Bool) => true,
-            (TypeTag::Proc(v1, r1), TypeTag::Proc(v2, r2)) => {
-                v1 == v2 && r1 == r2
-            }
+            (TypeTag::Proc(v1, r1), TypeTag::Proc(v2, r2)) => v1 == v2 && r1 == r2,
             _ => false,
         }
     }
@@ -502,7 +500,7 @@ impl<'a> Parser<'a> {
 
     fn parse_type(&mut self) -> Result<LetType, String> {
         match self.current {
-            Token::Int =>  {
+            Token::Int => {
                 self.advance()?;
                 Ok(LetType::new_int())
             }

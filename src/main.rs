@@ -2,6 +2,7 @@ mod compiler;
 mod name_analysis;
 mod parser;
 mod runtime;
+mod symbol_table;
 mod type_checking;
 
 use std::error::Error;
