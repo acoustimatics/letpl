@@ -1,5 +1,6 @@
-use crate::parser::{Expr, LetType, Program};
+use crate::parser::{Expr, Program};
 use crate::symbol_table::SymbolTable;
+use crate::types::LetType;
 
 pub fn let_type_of(program: &Program) -> Result<LetType, String> {
     let mut tenv = SymbolTable::new();

@@ -4,12 +4,13 @@ mod parser;
 mod runtime;
 mod symbol_table;
 mod type_checking;
+mod types;
 
 use std::error::Error;
 use std::io::Write;
 use std::{env, fs, io};
 
-use parser::LetType;
+use types::LetType;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
