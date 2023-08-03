@@ -1,6 +1,6 @@
 # letpl
 
-An implementation of the programming languages from Chapter 3 of _Essentials of Programming Languages_ by Daniel P. Friedman and Mitchell Wand.
+letpl is a toy programming langauge based on the example langauges in the book _Essentials of Programming Languages_ by Daniel P. Friedman and Mitchell Wand.
 
 # Language
 
