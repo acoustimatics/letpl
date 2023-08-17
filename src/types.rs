@@ -21,9 +21,6 @@ impl LetType {
         Self { let_type }
     }
 
-    pub fn as_proc(&self) -> Option<(&LetType, &LetType)> {
-    }
-
     pub fn is_int(&self) -> bool {
         match self.let_type.as_ref() {
             TypeTag::Int => true,
@@ -35,6 +32,13 @@ impl LetType {
         match self.let_type.as_ref() {
             TypeTag::Bool => true,
             _ => false,
+        }
+    }
+
+    pub fn as_proc(&self) -> Option<(&LetType, &LetType)> {
+        match self.let_type.as_ref() {
+            TypeTag::Proc(t_arg, t_body) => Some((t_arg, t_body)),
+            _ => None,
         }
     }
 }

@@ -9,6 +9,20 @@ pub fn let_type_of(program: &Program) -> Result<LetType, String> {
 
 fn let_type_of_expr(expr: &Expr, tenv: &mut SymbolTable<LetType>) -> Result<LetType, String> {
     match expr {
+        Expr::Call(proc, arg) => {
+            let t_proc = let_type_of_expr(proc, tenv)?;
+            let Some((t_param, t_body)) = t_proc.as_proc() else {
+                let msg = format!("call expects proc but got `{}`", t_proc);
+                return Err(msg);
+            };
+            let t_arg = let_type_of_expr(arg, tenv)?;
+            if t_param != &t_arg {
+                let msg = format!("call expect `{}` argument but got `{}`", t_arg, t_param);
+                return Err(msg);
+            }
+            Ok(t_body.clone())
+        }
+
         Expr::Const(_) => Ok(LetType::new_int()),
 
         Expr::Diff(e1, e2) => {
@@ -73,6 +87,21 @@ fn let_type_of_expr(expr: &Expr, tenv: &mut SymbolTable<LetType>) -> Result<LetT
             Ok(t_proc)
         }
 
+        Expr::LetRec { result_type, name, var, var_type, proc_body, let_body } => {
+            let t_proc = LetType::new_proc(var_type.clone(), result_type.clone());
+            tenv.push(name, &t_proc);
+            tenv.push(var, var_type);
+            let t_body = let_type_of_expr(proc_body, tenv)?;
+            if t_body != *result_type {
+                let msg = format!("`{}` expect result of type `{}` but got `{}`.", name, result_type, t_body);
+                return Err(msg);
+            }
+            tenv.pop();
+            let t_let_body = let_type_of_expr(let_body, tenv)?;
+            tenv.pop();
+            Ok(t_let_body)
+        }
+
         Expr::Var(var) => match tenv.lookup(var) {
             Some(t_var) => Ok(t_var.clone()),
             None => {
@@ -80,7 +109,5 @@ fn let_type_of_expr(expr: &Expr, tenv: &mut SymbolTable<LetType>) -> Result<LetT
                 Err(msg)
             }
         },
-
-        _ => Err("unimplemented".to_owned()),
     }
 }
