@@ -150,7 +150,7 @@ macro_rules! pop_int {
     };
 }
 
-pub fn run(program: &[Op]) -> Result<(), String> {
+pub fn run(program: &[Op]) -> Result<Value, String> {
     let mut stack = Vec::<Value>::new();
     let mut call_stack = Vec::<Frame>::new();
 
@@ -271,5 +271,5 @@ pub fn run(program: &[Op]) -> Result<(), String> {
         }
     }
 
-    Ok(())
+    Ok(pop!(stack))
 }

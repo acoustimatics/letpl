@@ -10,7 +10,10 @@ use std::error::Error;
 use std::io::Write;
 use std::{env, fs, io};
 
+use runtime::Value;
 use types::LetType;
+
+type EvalResult = Result<(Value, LetType), Box<dyn Error>>;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -34,13 +37,13 @@ fn repl() -> ! {
     }
 }
 
-fn read_file_eval(path: &str) -> Result<LetType, Box<dyn Error>> {
+fn read_file_eval(path: &str) -> EvalResult {
     let src = fs::read_to_string(path)?;
     let t = eval(&src)?;
     Ok(t)
 }
 
-fn read_eval() -> Result<LetType, Box<dyn Error>> {
+fn read_eval() -> EvalResult {
     let src = read()?;
     let t = eval(&src)?;
     Ok(t)
@@ -54,18 +57,21 @@ fn read() -> Result<String, Box<dyn Error>> {
     Ok(buffer)
 }
 
-fn eval(src: &str) -> Result<LetType, Box<dyn Error>> {
+fn eval(src: &str) -> EvalResult {
     let program = parser::parse(src)?;
     let program_type = type_checking::let_type_of(&program)?;
     let nameless_program = name_analysis::resolve_names(&program)?;
     let compiled_program = compiler::compile(&nameless_program)?;
-    runtime::run(&compiled_program)?;
-    Ok(program_type)
+    let value = runtime::run(&compiled_program)?;
+    Ok((value, program_type))
 }
 
-fn print(result: Result<LetType, Box<dyn Error>>) {
+fn print(result: EvalResult) {
     match result {
-        Ok(program_type) => println!("{}", program_type),
+        Ok((value, program_type)) => {
+            println!("{}", value);
+            println!("{}", program_type);
+        }
         Err(e) => eprintln!("error: {}", e),
     }
 }
