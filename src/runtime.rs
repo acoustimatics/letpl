@@ -54,16 +54,16 @@ impl Value {
 impl fmt::Display for Value {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Value::Integer(x) => write!(f, "{}", x),
-            Value::Boolean(b) => write!(f, "{}", b),
-            Value::Procedure(p) => write!(f, "{}", p),
+            Value::Integer(x) => write!(f, "{x}"),
+            Value::Boolean(b) => write!(f, "{b}"),
+            Value::Procedure(p) => write!(f, "{p}"),
         }
     }
 }
 
 impl fmt::Debug for Value {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self)
+        write!(f, "{self}")
     }
 }
 
@@ -212,7 +212,7 @@ pub fn run(program: &[Op]) -> Result<Value, String> {
 
             Op::Print => {
                 let v = &stack[stack.len() - 1];
-                println!("{}", v);
+                println!("{v}");
             }
 
             Op::PushCapture(capture_index) => {

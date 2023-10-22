@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 mod compiler;
 mod name_analysis;
 mod parser;
@@ -69,9 +71,9 @@ fn eval(src: &str) -> EvalResult {
 fn print(result: EvalResult) {
     match result {
         Ok((value, program_type)) => {
-            println!("{}", value);
-            println!("{}", program_type);
+            println!("{value}");
+            println!("{program_type}");
         }
-        Err(e) => eprintln!("error: {}", e),
+        Err(e) => eprintln!("error: {e}"),
     }
 }

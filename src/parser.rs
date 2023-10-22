@@ -85,7 +85,7 @@ impl fmt::Display for Token {
             Token::Eof => "EOF",
             Token::Equal => "=",
             Token::Identifier(id) => {
-                return write!(f, "identifier({})", id);
+                return write!(f, "identifier({id})");
             }
             Token::If => "if",
             Token::In => "in",
@@ -101,7 +101,7 @@ impl fmt::Display for Token {
             Token::Then => "then",
             Token::IsZero => "zero?",
         };
-        write!(f, "{}", token_str)
+        write!(f, "{token_str}")
     }
 }
 
@@ -146,7 +146,10 @@ impl<'a> Scanner<'a> {
 
     /// Attempt to get the next token in the source text.
     fn next_token(&mut self) -> Result<Token, String> {
-        use Token::*;
+        use Token::{
+            Bool, Colon, Comma, Else, Eof, Equal, Identifier, If, In, Int, IsZero, LeftParen, Let,
+            LetRec, MinusSign, Print, Proc, RightParen, Then,
+        };
 
         self.skip_whitespace_comments();
 
@@ -196,7 +199,7 @@ impl<'a> Scanner<'a> {
             ',' => Comma,
             '-' => MinusSign,
             '=' => Equal,
-            c => return Err(format!("unexpected character '{}'", c)),
+            c => return Err(format!("unexpected character '{c}'")),
         };
 
         // Advance past the last character in the operator.
@@ -223,7 +226,7 @@ impl<'a> Scanner<'a> {
 
         match s.parse() {
             Ok(x) => Ok(Token::Number(x)),
-            Err(_) => Err(format!("'{}' cannot be converted to a number", s)),
+            Err(_) => Err(format!("'{s}' cannot be converted to a number")),
         }
     }
 
@@ -317,7 +320,7 @@ impl<'a> Parser<'a> {
             Token::Print => self.print_expr(),
             Token::Proc => self.proc_expr(),
             Token::LeftParen => self.call_expr(),
-            unexpected_token => Err(format!("unexpected token `{:}`", unexpected_token)),
+            unexpected_token => Err(format!("unexpected token `{unexpected_token:}`")),
         }
     }
 

@@ -3,7 +3,7 @@ use std::fmt;
 use crate::name_analysis::{self, Expr, Program};
 use crate::runtime::{self, Op, Value};
 
-#[derive(PartialEq)]
+#[derive(Copy, Clone, PartialEq)]
 enum ExprPos {
     Operand,
     Tail,
@@ -144,7 +144,7 @@ impl fmt::Debug for Chunk {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(f, "*** chunk {} ops ***", self.ops.len())?;
         for (address, op) in self.ops.iter().enumerate() {
-            writeln!(f, "{}\t{:?}", address, op)?;
+            writeln!(f, "{address}\t{op:?}")?;
         }
         Ok(())
     }

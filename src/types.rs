@@ -2,7 +2,7 @@ use std::fmt;
 use std::rc::Rc;
 
 pub struct LetType {
-     let_type: Rc<TypeTag>,
+    let_type: Rc<TypeTag>,
 }
 
 impl LetType {
@@ -71,8 +71,7 @@ enum TypeTag {
 impl PartialEq for TypeTag {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
-            (TypeTag::Int, TypeTag::Int) => true,
-            (TypeTag::Bool, TypeTag::Bool) => true,
+            (TypeTag::Int, TypeTag::Int) | (TypeTag::Bool, TypeTag::Bool) => true,
             (TypeTag::Proc(v1, r1), TypeTag::Proc(v2, r2)) => v1 == v2 && r1 == r2,
             _ => false,
         }
@@ -84,8 +83,7 @@ impl fmt::Display for TypeTag {
         match self {
             TypeTag::Int => write!(f, "int"),
             TypeTag::Bool => write!(f, "bool"),
-            TypeTag::Proc(var, result) => write!(f, "({} -> {})", var, result),
+            TypeTag::Proc(var, result) => write!(f, "({var} -> {result})"),
         }
     }
 }
-

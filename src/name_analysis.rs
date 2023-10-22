@@ -149,7 +149,7 @@ impl CompilerState {
     }
 
     fn end_scope(&mut self) {
-        self.current_bindings().pop()
+        self.current_bindings().pop();
     }
 
     fn begin_proc(&mut self, name: &str, var: &str) {
@@ -297,7 +297,7 @@ fn resolve_names_expr(expr: &parser::Expr, state: &mut CompilerState) -> Result<
                 state.push();
                 Ok(Box::new(Expr::Global(stack_index)))
             } else {
-                Err(format!("undefined name: {}", var))
+                Err(format!("undefined name: {var}"))
             }
         }
     }
@@ -306,7 +306,7 @@ fn resolve_names_expr(expr: &parser::Expr, state: &mut CompilerState) -> Result<
 fn resolve_names_proc(
     name: &str,
     var: &str,
-    body: &Box<parser::Expr>,
+    body: &parser::Expr,
     state: &mut CompilerState,
 ) -> Result<Box<Expr>, String> {
     state.begin_proc(name, var);
