@@ -1,3 +1,5 @@
+//! A stack-based bytecode VM.
+
 use std::fmt;
 use std::rc::Rc;
 
@@ -101,8 +103,6 @@ pub enum Op {
     /// Make a procedure using a start index and the environment. Push the
     /// procedure onto the stack.
     MakeProc(usize, Vec<Capture>),
-
-    Print,
 
     PushCapture(usize),
 
@@ -208,11 +208,6 @@ pub fn run(program: &[Op]) -> Result<Value, String> {
                 let proc = Rc::new(proc);
                 let value = Value::Procedure(proc);
                 stack.push(value);
-            }
-
-            Op::Print => {
-                let v = &stack[stack.len() - 1];
-                println!("{v}");
             }
 
             Op::PushCapture(capture_index) => {

@@ -1,4 +1,6 @@
-use crate::parser::{Expr, Program};
+//! Type checks a letpl program
+
+use crate::ast::{Expr, Program};
 use crate::symbol_table::SymbolTable;
 use crate::types::LetType;
 
@@ -75,8 +77,6 @@ fn let_type_of_expr(expr: &Expr, tenv: &mut SymbolTable<LetType>) -> Result<LetT
             tenv.pop();
             Ok(t_body)
         }
-
-        Expr::Print(e) => let_type_of_expr(e, tenv),
 
         Expr::Proc(var, t_var, body) => {
             tenv.push(var, t_var);

@@ -1,3 +1,5 @@
+//! A table of symbols and associated values.
+
 #[derive(Clone)]
 struct Symbol<T: Clone> {
     name: String,

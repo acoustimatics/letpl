@@ -1,3 +1,5 @@
+//! A bytecode compiler for letpl.
+
 use std::fmt;
 
 use crate::name_analysis::{self, Expr, Program};
@@ -85,11 +87,6 @@ fn compile_expr(
 
         Expr::Local(i) => {
             chunk.emit(Op::PushLocal(*i));
-        }
-
-        Expr::Print(e) => {
-            compile_expr(e, scope, ExprPos::Operand, chunk)?;
-            chunk.emit(Op::Print);
         }
 
         Expr::Proc(body, captures) => {

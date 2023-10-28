@@ -1,6 +1,9 @@
+//! Types in letpl.
+
 use std::fmt;
 use std::rc::Rc;
 
+/// Represents a type in letpl.
 pub struct LetType {
     let_type: Rc<TypeTag>,
 }

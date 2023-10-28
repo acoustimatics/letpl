@@ -1,9 +1,11 @@
 #![warn(clippy::pedantic)]
 
+mod ast;
 mod compiler;
 mod name_analysis;
 mod parser;
 mod runtime;
+mod scanner;
 mod symbol_table;
 mod type_checking;
 mod types;

@@ -1,4 +1,6 @@
-use crate::parser;
+//! Analysis of how identifier names are used in an letpl program.
+
+use crate::ast;
 use crate::symbol_table::SymbolTable;
 
 pub struct Program {
@@ -23,8 +25,6 @@ pub enum Expr {
     Let(Box<Expr>, Box<Expr>),
 
     Local(usize),
-
-    Print(Box<Expr>),
 
     Proc(Box<Expr>, Vec<Cap>),
 }
@@ -209,15 +209,15 @@ impl CompilerState {
     }
 }
 
-pub fn resolve_names(program: &parser::Program) -> Result<Program, String> {
+pub fn resolve_names(program: &ast::Program) -> Result<Program, String> {
     let mut state = CompilerState::new();
     let expr = resolve_names_expr(&program.expr, &mut state)?;
     Ok(Program { expr })
 }
 
-fn resolve_names_expr(expr: &parser::Expr, state: &mut CompilerState) -> Result<Box<Expr>, String> {
+fn resolve_names_expr(expr: &ast::Expr, state: &mut CompilerState) -> Result<Box<Expr>, String> {
     match expr {
-        parser::Expr::Call(proc, arg) => {
+        ast::Expr::Call(proc, arg) => {
             let proc = resolve_names_expr(proc, state)?;
             let arg = resolve_names_expr(arg, state)?;
             state.pop();
@@ -226,12 +226,12 @@ fn resolve_names_expr(expr: &parser::Expr, state: &mut CompilerState) -> Result<
             Ok(Box::new(Expr::Call(proc, arg)))
         }
 
-        parser::Expr::Const(x) => {
+        ast::Expr::Const(x) => {
             state.push();
             Ok(Box::new(Expr::Const(*x)))
         }
 
-        parser::Expr::Diff(lhs, rhs) => {
+        ast::Expr::Diff(lhs, rhs) => {
             let lhs = resolve_names_expr(lhs, state)?;
             let rhs = resolve_names_expr(rhs, state)?;
             state.pop();
@@ -240,7 +240,7 @@ fn resolve_names_expr(expr: &parser::Expr, state: &mut CompilerState) -> Result<
             Ok(Box::new(Expr::Diff(lhs, rhs)))
         }
 
-        parser::Expr::If(guard, consq, alt) => {
+        ast::Expr::If(guard, consq, alt) => {
             let guard = resolve_names_expr(guard, state)?;
             state.pop();
             state.save_stack();
@@ -250,14 +250,14 @@ fn resolve_names_expr(expr: &parser::Expr, state: &mut CompilerState) -> Result<
             Ok(Box::new(Expr::If(guard, consq, alt)))
         }
 
-        parser::Expr::IsZero(e) => {
+        ast::Expr::IsZero(e) => {
             let e = resolve_names_expr(e, state)?;
             state.pop();
             state.push();
             Ok(Box::new(Expr::IsZero(e)))
         }
 
-        parser::Expr::Let(var, rhs, body) => {
+        ast::Expr::Let(var, rhs, body) => {
             let rhs = resolve_names_expr(rhs, state)?;
             state.begin_scope(var);
             let body = resolve_names_expr(body, state)?;
@@ -265,7 +265,7 @@ fn resolve_names_expr(expr: &parser::Expr, state: &mut CompilerState) -> Result<
             Ok(Box::new(Expr::Let(rhs, body)))
         }
 
-        parser::Expr::LetRec {
+        ast::Expr::LetRec {
             name,
             var,
             proc_body,
@@ -279,14 +279,9 @@ fn resolve_names_expr(expr: &parser::Expr, state: &mut CompilerState) -> Result<
             Ok(Box::new(Expr::Let(proc, let_body)))
         }
 
-        parser::Expr::Print(e) => {
-            let e = resolve_names_expr(e, state)?;
-            Ok(Box::new(Expr::Print(e)))
-        }
+        ast::Expr::Proc(var, _, body) => resolve_names_proc("", var, body, state),
 
-        parser::Expr::Proc(var, _, body) => resolve_names_proc("", var, body, state),
-
-        parser::Expr::Var(var) => {
+        ast::Expr::Var(var) => {
             if let Some(&stack_index) = state.lookup_local(var) {
                 state.push();
                 Ok(Box::new(Expr::Local(stack_index)))
@@ -306,7 +301,7 @@ fn resolve_names_expr(expr: &parser::Expr, state: &mut CompilerState) -> Result<
 fn resolve_names_proc(
     name: &str,
     var: &str,
-    body: &parser::Expr,
+    body: &ast::Expr,
     state: &mut CompilerState,
 ) -> Result<Box<Expr>, String> {
     state.begin_proc(name, var);
