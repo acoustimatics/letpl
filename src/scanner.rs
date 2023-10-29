@@ -20,7 +20,6 @@ pub enum Token {
     LeftParen,
     Let,
     LetRec,
-    Print,
     Proc,
     MinusSign,
     Number(i64),
@@ -48,7 +47,6 @@ impl fmt::Display for Token {
             Token::LeftParen => "(",
             Token::Let => "let",
             Token::LetRec => "letrec",
-            Token::Print => "print",
             Token::Proc => "proc",
             Token::MinusSign => "-",
             Token::Number(_) => "number",
@@ -101,16 +99,11 @@ impl<'a> Scanner<'a> {
 
     /// Attempt to get the next token in the source text.
     pub fn next_token(&mut self) -> Result<Token, String> {
-        use Token::{
-            Bool, Colon, Comma, Else, Eof, Equal, Identifier, If, In, Int, IsZero, LeftParen, Let,
-            LetRec, MinusSign, Print, Proc, RightParen, Then,
-        };
-
         self.skip_whitespace_comments();
 
         // Handle end of code.
         if self.current.is_none() {
-            return Ok(Eof);
+            return Ok(Token::Eof);
         }
 
         // Handle identifiers and keywords.
@@ -124,18 +117,17 @@ impl<'a> Scanner<'a> {
             }
 
             let token = match s.as_ref() {
-                "bool" => Bool,
-                "else" => Else,
-                "if" => If,
-                "in" => In,
-                "int" => Int,
-                "let" => Let,
-                "letrec" => LetRec,
-                "print" => Print,
-                "proc" => Proc,
-                "then" => Then,
-                "zero?" => IsZero,
-                _ => Identifier(s),
+                "bool" => Token::Bool,
+                "else" => Token::Else,
+                "if" => Token::If,
+                "in" => Token::In,
+                "int" => Token::Int,
+                "let" => Token::Let,
+                "letrec" => Token::LetRec,
+                "proc" => Token::Proc,
+                "then" => Token::Then,
+                "zero?" => Token::IsZero,
+                _ => Token::Identifier(s),
             };
 
             return Ok(token);
@@ -148,12 +140,12 @@ impl<'a> Scanner<'a> {
 
         // Handle operators.
         let token = match self.current.unwrap() {
-            '(' => LeftParen,
-            ')' => RightParen,
-            ':' => Colon,
-            ',' => Comma,
-            '-' => MinusSign,
-            '=' => Equal,
+            '(' => Token::LeftParen,
+            ')' => Token::RightParen,
+            ':' => Token::Colon,
+            ',' => Token::Comma,
+            '-' => Token::MinusSign,
+            '=' => Token::Equal,
             c => return Err(format!("unexpected character '{c}'")),
         };
 

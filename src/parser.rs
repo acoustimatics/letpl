@@ -123,15 +123,13 @@ impl<'a> Parser<'a> {
 
     fn let_rec_expr(&mut self) -> ExprResult {
         self.advance()?;
+        let result_type = self.parse_type()?;
         let name = self.expect_identifer()?;
         self.expect(Token::LeftParen)?;
         let var = self.expect_identifer()?;
         self.expect(Token::Colon)?;
         let var_type = self.parse_type()?;
         self.expect(Token::RightParen)?;
-        self.expect(Token::Arrow)?;
-        let result_type = self.parse_type()?;
-        self.expect(Token::Equal)?;
         let proc_body = self.expr()?;
         self.expect(Token::In)?;
         let let_body = self.expr()?;

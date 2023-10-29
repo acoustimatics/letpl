@@ -1,0 +1,13 @@
+let send_one = proc (f : (int -> int))
+    (f 1)
+in
+
+letrec int send_two(f: (int -> int))
+    (f 2)
+in
+
+let add_one = proc (x : int)
+    -(x, -(0, 1))
+in
+
+(send_one add_one)
