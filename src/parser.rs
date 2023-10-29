@@ -1,240 +1,8 @@
-use std::fmt;
-use std::str::Chars;
+//! A recursive decent letpl parser.
 
-/// Represents a Program node in an AST.
-pub struct Program {
-    pub expr: Box<Expr>,
-}
-
-/// Represents an Expression node in an AST.
-pub enum Expr {
-    /// Represents a constant numerical expression.
-    Const(f64),
-
-    /// Represents an expression that takes the difference of two
-    /// sub-expressions.
-    Diff(Box<Expr>, Box<Expr>),
-
-    /// Represents an expression that test if a sub-expression is zero.
-    IsZero(Box<Expr>),
-
-    /// Represents and if/then/else expression.
-    If(Box<Expr>, Box<Expr>, Box<Expr>),
-
-    /// Represents a variable lookup expression.
-    Var(String),
-
-    /// Represent an let/in expression.
-    Let(String, Box<Expr>, Box<Expr>),
-
-    Print(Box<Expr>),
-
-    /// Represents a procedure.
-    Proc(String, Box<Expr>),
-
-    /// Represents a procedure call.
-    Call(Box<Expr>, Box<Expr>),
-
-    /// Represents a recursve procedure.
-    LetRec {
-        name: String,
-        var: String,
-        proc_body: Box<Expr>,
-        let_body: Box<Expr>,
-    },
-}
-
-/// Represents a token in a source text.
-#[derive(PartialEq)]
-enum Token {
-    Comma,
-    Else,
-    Eof,
-    Equal,
-    Identifier(String),
-    If,
-    In,
-    LeftParen,
-    Let,
-    LetRec,
-    Print,
-    Proc,
-    MinusSign,
-    Number(f64),
-    RightParen,
-    Then,
-    IsZero,
-}
-
-impl fmt::Display for Token {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let token_str = match self {
-            Token::Comma => ",",
-            Token::Else => "else",
-            Token::Eof => "EOF",
-            Token::Equal => "=",
-            Token::Identifier(id) => {
-                return write!(f, "identifier({})", id);
-            }
-            Token::If => "if",
-            Token::In => "in",
-            Token::LeftParen => "(",
-            Token::Let => "let",
-            Token::LetRec => "letrec",
-            Token::Print => "print",
-            Token::Proc => "proc",
-            Token::MinusSign => "-",
-            Token::Number(_) => "number",
-            Token::RightParen => ")",
-            Token::Then => "then",
-            Token::IsZero => "zero?",
-        };
-        write!(f, "{}", token_str)
-    }
-}
-
-/// Represents an object which converts a source text into a stream of tokens.
-struct Scanner<'a> {
-    chars: Chars<'a>,
-    current: Option<char>,
-}
-
-impl<'a> Scanner<'a> {
-    /// Creates a scanner object which is ready to produce tokens from a given
-    /// source text.
-    fn new(src: &str) -> Scanner {
-        let mut scanner = Scanner {
-            chars: src.chars(),
-            current: None,
-        };
-        scanner.advance();
-        scanner
-    }
-
-    fn advance(&mut self) {
-        self.current = self.chars.next();
-    }
-
-    fn skip_whitespace_comments(&mut self) {
-        let mut in_comment = false;
-        while let Some(c) = self.current {
-            if c == '#' {
-                in_comment = true;
-                self.advance();
-            } else if c == '\n' && in_comment {
-                in_comment = false;
-                self.advance();
-            } else if is_whitespace(c) || in_comment {
-                self.advance();
-            } else {
-                break;
-            }
-        }
-    }
-
-    /// Attempt to get the next token in the source text.
-    fn next_token(&mut self) -> Result<Token, String> {
-        use Token::*;
-
-        self.skip_whitespace_comments();
-
-        // Handle end of code.
-        if self.current.is_none() {
-            return Ok(Eof);
-        }
-
-        // Handle identifiers and keywords.
-        if self.current.map_or(false, is_alpha) {
-            let mut s = String::new();
-            while self
-                .current
-                .map_or(false, |c| is_alpha(c) || is_digit(c) || c == '?')
-            {
-                self.collect(&mut s);
-            }
-
-            let token = match s.as_ref() {
-                "else" => Else,
-                "if" => If,
-                "in" => In,
-                "let" => Let,
-                "letrec" => LetRec,
-                "print" => Print,
-                "proc" => Proc,
-                "then" => Then,
-                "zero?" => IsZero,
-                _ => Identifier(s),
-            };
-
-            return Ok(token);
-        }
-
-        // Handle a number literal.
-        if self.current.map_or(false, is_digit) {
-            return self.number_literal();
-        }
-
-        // Handle operators.
-        let token = match self.current.unwrap() {
-            '(' => LeftParen,
-            ')' => RightParen,
-            ',' => Comma,
-            '-' => MinusSign,
-            '=' => Equal,
-            c => return Err(format!("unexpected character '{}'", c)),
-        };
-
-        // Advance past the last character in the operator.
-        self.advance();
-
-        Ok(token)
-    }
-
-    fn number_literal(&mut self) -> Result<Token, String> {
-        let mut s = String::new();
-
-        while self.current.map_or(false, is_digit) {
-            self.collect(&mut s);
-        }
-
-        if self.current.map_or(false, |c| c == '.') {
-            self.collect(&mut s);
-
-            match self.current {
-                Some(c) if is_digit(c) => self.collect(&mut s),
-                _ => {
-                    return Err(String::from("expected digit after decimal point"));
-                }
-            }
-
-            while self.current.map_or(false, is_digit) {
-                self.collect(&mut s)
-            }
-        }
-
-        match s.parse() {
-            Ok(x) => Ok(Token::Number(x)),
-            Err(_) => Err(format!("'{}' cannot be converted to a number", s)),
-        }
-    }
-
-    fn collect(&mut self, s: &mut String) {
-        s.push(self.current.unwrap());
-        self.advance();
-    }
-}
-
-fn is_alpha(c: char) -> bool {
-    c.is_ascii_alphabetic() || c == '_'
-}
-
-fn is_digit(c: char) -> bool {
-    c.is_ascii_digit()
-}
-
-fn is_whitespace(c: char) -> bool {
-    c == ' ' || c == '\t' || c == '\r' || c == '\n'
-}
+use crate::ast::{Program, Expr};
+use crate::types::LetType;
+use crate::scanner::{Token, Scanner};
 
 type ExprResult = Result<Box<Expr>, String>;
 
@@ -305,10 +73,9 @@ impl<'a> Parser<'a> {
             }
             Token::Let => self.let_expr(),
             Token::LetRec => self.let_rec_expr(),
-            Token::Print => self.print_expr(),
             Token::Proc => self.proc_expr(),
             Token::LeftParen => self.call_expr(),
-            unexpected_token => Err(format!("unexpected token `{:}`", unexpected_token)),
+            unexpected_token => Err(format!("unexpected token `{unexpected_token:}`")),
         }
     }
 
@@ -356,40 +123,37 @@ impl<'a> Parser<'a> {
 
     fn let_rec_expr(&mut self) -> ExprResult {
         self.advance()?;
+        let result_type = self.parse_type()?;
         let name = self.expect_identifer()?;
         self.expect(Token::LeftParen)?;
         let var = self.expect_identifer()?;
+        self.expect(Token::Colon)?;
+        let var_type = self.parse_type()?;
         self.expect(Token::RightParen)?;
-        self.expect(Token::Equal)?;
         let proc_body = self.expr()?;
         self.expect(Token::In)?;
         let let_body = self.expr()?;
 
         Ok(Box::new(Expr::LetRec {
+            result_type,
             name,
             var,
+            var_type,
             proc_body,
             let_body,
         }))
-    }
-
-    fn print_expr(&mut self) -> ExprResult {
-        self.advance()?;
-        self.expect(Token::LeftParen)?;
-        let expr = self.expr()?;
-        self.expect(Token::RightParen)?;
-
-        Ok(Box::new(Expr::Print(expr)))
     }
 
     fn proc_expr(&mut self) -> ExprResult {
         self.advance()?;
         self.expect(Token::LeftParen)?;
         let var = self.expect_identifer()?;
+        self.expect(Token::Colon)?;
+        let ty = self.parse_type()?;
         self.expect(Token::RightParen)?;
         let body = self.expr()?;
 
-        Ok(Box::new(Expr::Proc(var, body)))
+        Ok(Box::new(Expr::Proc(var, ty, body)))
     }
 
     fn call_expr(&mut self) -> ExprResult {
@@ -399,5 +163,27 @@ impl<'a> Parser<'a> {
         self.expect(Token::RightParen)?;
 
         Ok(Box::new(Expr::Call(operator, operand)))
+    }
+
+    fn parse_type(&mut self) -> Result<LetType, String> {
+        match self.current {
+            Token::Int => {
+                self.advance()?;
+                Ok(LetType::new_int())
+            }
+            Token::Bool => {
+                self.advance()?;
+                Ok(LetType::new_bool())
+            }
+            Token::LeftParen => {
+                self.advance()?;
+                let var_type = self.parse_type()?;
+                self.expect(Token::Arrow)?;
+                let result_type = self.parse_type()?;
+                self.expect(Token::RightParen)?;
+                Ok(LetType::new_proc(var_type, result_type))
+            }
+            _ => Err(format!("unexpected token `{}`", self.current)),
+        }
     }
 }

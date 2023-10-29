@@ -1,3 +1,5 @@
+//! A stack-based bytecode VM.
+
 use std::fmt;
 use std::rc::Rc;
 
@@ -23,16 +25,16 @@ impl fmt::Display for Procedure {
 /// Represents final value to which an expression can evalutate.
 #[derive(Clone)]
 pub enum Value {
-    Number(f64),
+    Integer(i64),
     Boolean(bool),
     Procedure(Rc<Procedure>),
 }
 
 impl Value {
-    pub fn as_number(&self) -> Result<f64, String> {
+    pub fn as_int(&self) -> Result<i64, String> {
         match self {
-            Value::Number(x) => Ok(*x),
-            _ => Err(String::from("value is not a number")),
+            Value::Integer(x) => Ok(*x),
+            _ => Err(String::from("value is not an integer")),
         }
     }
 
@@ -54,16 +56,16 @@ impl Value {
 impl fmt::Display for Value {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Value::Number(x) => write!(f, "{}", x),
-            Value::Boolean(b) => write!(f, "{}", b),
-            Value::Procedure(p) => write!(f, "{}", p),
+            Value::Integer(x) => write!(f, "{x}"),
+            Value::Boolean(b) => write!(f, "{b}"),
+            Value::Procedure(p) => write!(f, "{p}"),
         }
     }
 }
 
 impl fmt::Debug for Value {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self)
+        write!(f, "{self}")
     }
 }
 
@@ -101,8 +103,6 @@ pub enum Op {
     /// Make a procedure using a start index and the environment. Push the
     /// procedure onto the stack.
     MakeProc(usize, Vec<Capture>),
-
-    Print,
 
     PushCapture(usize),
 
@@ -144,13 +144,13 @@ macro_rules! pop {
     };
 }
 
-macro_rules! pop_number {
+macro_rules! pop_int {
     ($stack:expr) => {
-        $stack.pop().unwrap().as_number()
+        $stack.pop().unwrap().as_int()
     };
 }
 
-pub fn run(program: &[Op]) -> Result<(), String> {
+pub fn run(program: &[Op]) -> Result<Value, String> {
     let mut stack = Vec::<Value>::new();
     let mut call_stack = Vec::<Frame>::new();
 
@@ -174,15 +174,15 @@ pub fn run(program: &[Op]) -> Result<(), String> {
             }
 
             Op::Diff => {
-                let x2 = pop_number!(stack)?;
-                let x1 = pop_number!(stack)?;
-                let v = Value::Number(x1 - x2);
+                let x2 = pop_int!(stack)?;
+                let x1 = pop_int!(stack)?;
+                let v = Value::Integer(x1 - x2);
                 stack.push(v);
             }
 
             Op::IsZero => {
-                let x = pop_number!(stack)?;
-                let v = Value::Boolean(x == 0.0);
+                let x = pop_int!(stack)?;
+                let v = Value::Boolean(x == 0);
                 stack.push(v);
             }
 
@@ -208,11 +208,6 @@ pub fn run(program: &[Op]) -> Result<(), String> {
                 let proc = Rc::new(proc);
                 let value = Value::Procedure(proc);
                 stack.push(value);
-            }
-
-            Op::Print => {
-                let v = &stack[stack.len() - 1];
-                println!("{}", v);
             }
 
             Op::PushCapture(capture_index) => {
@@ -271,5 +266,5 @@ pub fn run(program: &[Op]) -> Result<(), String> {
         }
     }
 
-    Ok(())
+    Ok(pop!(stack))
 }

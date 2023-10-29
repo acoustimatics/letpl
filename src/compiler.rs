@@ -1,9 +1,11 @@
+//! A bytecode compiler for letpl.
+
 use std::fmt;
 
 use crate::name_analysis::{self, Expr, Program};
 use crate::runtime::{self, Op, Value};
 
-#[derive(PartialEq)]
+#[derive(Copy, Clone, PartialEq)]
 enum ExprPos {
     Operand,
     Tail,
@@ -47,7 +49,7 @@ fn compile_expr(
         }
 
         Expr::Const(x) => {
-            let v = Value::Number(*x);
+            let v = Value::Integer(*x);
             chunk.emit(Op::PushValue(v));
         }
 
@@ -85,11 +87,6 @@ fn compile_expr(
 
         Expr::Local(i) => {
             chunk.emit(Op::PushLocal(*i));
-        }
-
-        Expr::Print(e) => {
-            compile_expr(e, scope, ExprPos::Operand, chunk)?;
-            chunk.emit(Op::Print);
         }
 
         Expr::Proc(body, captures) => {
@@ -144,7 +141,7 @@ impl fmt::Debug for Chunk {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(f, "*** chunk {} ops ***", self.ops.len())?;
         for (address, op) in self.ops.iter().enumerate() {
-            writeln!(f, "{}\t{:?}", address, op)?;
+            writeln!(f, "{address}\t{op:?}")?;
         }
         Ok(())
     }

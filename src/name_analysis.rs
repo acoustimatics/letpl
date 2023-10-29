@@ -1,6 +1,7 @@
-use std::fmt;
+//! Analysis of how identifier names are used in an letpl program.
 
-use crate::parser;
+use crate::ast;
+use crate::symbol_table::SymbolTable;
 
 pub struct Program {
     pub expr: Box<Expr>,
@@ -11,7 +12,7 @@ pub enum Expr {
 
     Capture(usize),
 
-    Const(f64),
+    Const(i64),
 
     Diff(Box<Expr>, Box<Expr>),
 
@@ -25,8 +26,6 @@ pub enum Expr {
 
     Local(usize),
 
-    Print(Box<Expr>),
-
     Proc(Box<Expr>, Vec<Cap>),
 }
 
@@ -35,59 +34,7 @@ pub enum Cap {
     Capture(usize),
 }
 
-#[derive(Clone)]
-struct Binding {
-    name: String,
-    stack_index: usize,
-}
-
-impl Binding {
-    fn new(name: &str, stack_index: usize) -> Self {
-        let name = name.to_owned();
-        Self { name, stack_index }
-    }
-}
-
-#[derive(Clone)]
-struct BindingTable {
-    bindings: Vec<Binding>,
-}
-
-impl BindingTable {
-    fn new() -> Self {
-        let bindings = Vec::new();
-        Self { bindings }
-    }
-
-    fn push(&mut self, name: &str, stack_index: usize) {
-        let binding = Binding::new(name, stack_index);
-        self.bindings.push(binding);
-    }
-
-    fn pop(&mut self) {
-        self.bindings.pop().expect("binding table underflow");
-    }
-
-    fn lookup(&self, lookup_name: &str) -> Option<usize> {
-        self.bindings
-            .iter()
-            .rev()
-            .find(|b| b.name == lookup_name)
-            .map(|b| b.stack_index)
-    }
-}
-
-impl fmt::Debug for BindingTable {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{{ ")?;
-        for binding in self.bindings.iter() {
-            write!(f, "{}#{} ", binding.name, binding.stack_index)?;
-        }
-        write!(f, "}}")
-    }
-}
-
-fn lookup(bindings: &Option<BindingTable>, lookup_name: &str) -> Option<usize> {
+fn lookup<'a>(bindings: &'a Option<SymbolTable<usize>>, lookup_name: &str) -> Option<&'a usize> {
     match bindings {
         Some(bindings) => bindings.lookup(lookup_name),
         None => None,
@@ -148,28 +95,17 @@ impl CaptureTable {
     }
 }
 
-impl fmt::Debug for CaptureTable {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{{ ")?;
-        for c in self.captures.iter() {
-            let kind = if c.is_local { "local" } else { "capture" };
-            write!(f, "{}:{}#{} ", c.name, kind, c.index)?;
-        }
-        write!(f, "}}")
-    }
-}
-
 struct Frame {
     stack_top: usize,
-    locals: Option<BindingTable>,
+    locals: Option<SymbolTable<usize>>,
     captures: CaptureTable,
 }
 
 struct CompilerState {
     stack_top: usize,
     save_stack: Vec<usize>,
-    globals: BindingTable,
-    locals: Option<BindingTable>,
+    globals: SymbolTable<usize>,
+    locals: Option<SymbolTable<usize>>,
     call_stack: Vec<Frame>,
 }
 
@@ -178,13 +114,13 @@ impl CompilerState {
         Self {
             stack_top: 0,
             save_stack: Vec::new(),
-            globals: BindingTable::new(),
+            globals: SymbolTable::new(),
             locals: None,
             call_stack: Vec::new(),
         }
     }
 
-    fn current_bindings(&mut self) -> &mut BindingTable {
+    fn current_bindings(&mut self) -> &mut SymbolTable<usize> {
         match self.locals.as_mut() {
             Some(locals) => locals,
             None => &mut self.globals,
@@ -209,16 +145,16 @@ impl CompilerState {
 
     fn begin_scope(&mut self, name: &str) {
         let stack_index = self.stack_top - 1;
-        self.current_bindings().push(name, stack_index);
+        self.current_bindings().push(name, &stack_index);
     }
 
     fn end_scope(&mut self) {
-        self.current_bindings().pop()
+        self.current_bindings().pop();
     }
 
     fn begin_proc(&mut self, name: &str, var: &str) {
         let stack_top = std::mem::replace(&mut self.stack_top, 0);
-        let locals = std::mem::replace(&mut self.locals, Some(BindingTable::new()));
+        let locals = std::mem::replace(&mut self.locals, Some(SymbolTable::new()));
         let frame = Frame {
             stack_top,
             locals,
@@ -240,7 +176,7 @@ impl CompilerState {
         frame.captures
     }
 
-    fn lookup_local(&mut self, lookup_name: &str) -> Option<usize> {
+    fn lookup_local(&mut self, lookup_name: &str) -> Option<&usize> {
         lookup(&self.locals, lookup_name)
     }
 
@@ -256,7 +192,7 @@ impl CompilerState {
     fn capture(&mut self, lookup_name: &str, call_depth: usize) -> Option<usize> {
         let frame = &mut self.call_stack[call_depth];
         if let Some(stack_index) = lookup(&frame.locals, lookup_name) {
-            let capture_index = frame.captures.add_local_capture(lookup_name, stack_index);
+            let capture_index = frame.captures.add_local_capture(lookup_name, *stack_index);
             Some(capture_index)
         } else if let Some(capture_index) = frame.captures.lookup(lookup_name) {
             Some(capture_index)
@@ -273,15 +209,15 @@ impl CompilerState {
     }
 }
 
-pub fn resolve_names(program: &parser::Program) -> Result<Program, String> {
+pub fn resolve_names(program: &ast::Program) -> Result<Program, String> {
     let mut state = CompilerState::new();
     let expr = resolve_names_expr(&program.expr, &mut state)?;
     Ok(Program { expr })
 }
 
-fn resolve_names_expr(expr: &parser::Expr, state: &mut CompilerState) -> Result<Box<Expr>, String> {
+fn resolve_names_expr(expr: &ast::Expr, state: &mut CompilerState) -> Result<Box<Expr>, String> {
     match expr {
-        parser::Expr::Call(proc, arg) => {
+        ast::Expr::Call(proc, arg) => {
             let proc = resolve_names_expr(proc, state)?;
             let arg = resolve_names_expr(arg, state)?;
             state.pop();
@@ -290,12 +226,12 @@ fn resolve_names_expr(expr: &parser::Expr, state: &mut CompilerState) -> Result<
             Ok(Box::new(Expr::Call(proc, arg)))
         }
 
-        parser::Expr::Const(x) => {
+        ast::Expr::Const(x) => {
             state.push();
             Ok(Box::new(Expr::Const(*x)))
         }
 
-        parser::Expr::Diff(lhs, rhs) => {
+        ast::Expr::Diff(lhs, rhs) => {
             let lhs = resolve_names_expr(lhs, state)?;
             let rhs = resolve_names_expr(rhs, state)?;
             state.pop();
@@ -304,7 +240,7 @@ fn resolve_names_expr(expr: &parser::Expr, state: &mut CompilerState) -> Result<
             Ok(Box::new(Expr::Diff(lhs, rhs)))
         }
 
-        parser::Expr::If(guard, consq, alt) => {
+        ast::Expr::If(guard, consq, alt) => {
             let guard = resolve_names_expr(guard, state)?;
             state.pop();
             state.save_stack();
@@ -314,14 +250,14 @@ fn resolve_names_expr(expr: &parser::Expr, state: &mut CompilerState) -> Result<
             Ok(Box::new(Expr::If(guard, consq, alt)))
         }
 
-        parser::Expr::IsZero(e) => {
+        ast::Expr::IsZero(e) => {
             let e = resolve_names_expr(e, state)?;
             state.pop();
             state.push();
             Ok(Box::new(Expr::IsZero(e)))
         }
 
-        parser::Expr::Let(var, rhs, body) => {
+        ast::Expr::Let(var, rhs, body) => {
             let rhs = resolve_names_expr(rhs, state)?;
             state.begin_scope(var);
             let body = resolve_names_expr(body, state)?;
@@ -329,11 +265,12 @@ fn resolve_names_expr(expr: &parser::Expr, state: &mut CompilerState) -> Result<
             Ok(Box::new(Expr::Let(rhs, body)))
         }
 
-        parser::Expr::LetRec {
+        ast::Expr::LetRec {
             name,
             var,
             proc_body,
             let_body,
+            ..
         } => {
             let proc = resolve_names_proc(name, var, proc_body, state)?;
             state.begin_scope(name);
@@ -342,25 +279,20 @@ fn resolve_names_expr(expr: &parser::Expr, state: &mut CompilerState) -> Result<
             Ok(Box::new(Expr::Let(proc, let_body)))
         }
 
-        parser::Expr::Print(e) => {
-            let e = resolve_names_expr(e, state)?;
-            Ok(Box::new(Expr::Print(e)))
-        }
+        ast::Expr::Proc(var, _, body) => resolve_names_proc("", var, body, state),
 
-        parser::Expr::Proc(var, body) => resolve_names_proc("", var, body, state),
-
-        parser::Expr::Var(var) => {
-            if let Some(stack_index) = state.lookup_local(var) {
+        ast::Expr::Var(var) => {
+            if let Some(&stack_index) = state.lookup_local(var) {
                 state.push();
                 Ok(Box::new(Expr::Local(stack_index)))
             } else if let Some(capture_index) = state.lookup_capture(var) {
                 state.push();
                 Ok(Box::new(Expr::Capture(capture_index)))
-            } else if let Some(stack_index) = state.globals.lookup(var) {
+            } else if let Some(&stack_index) = state.globals.lookup(var) {
                 state.push();
                 Ok(Box::new(Expr::Global(stack_index)))
             } else {
-                Err(format!("undefined name: {}", var))
+                Err(format!("undefined name: {var}"))
             }
         }
     }
@@ -369,7 +301,7 @@ fn resolve_names_expr(expr: &parser::Expr, state: &mut CompilerState) -> Result<
 fn resolve_names_proc(
     name: &str,
     var: &str,
-    body: &Box<parser::Expr>,
+    body: &ast::Expr,
     state: &mut CompilerState,
 ) -> Result<Box<Expr>, String> {
     state.begin_proc(name, var);
