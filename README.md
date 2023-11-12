@@ -17,6 +17,7 @@ letpl's grammar is:
                ::= "proc" "(" Identifier ":" Type ")" Expression
                ::= "(" Expression Expression ")"
                ::= "letrec" Type Identifier "(" Identifier ":" Type ")" Expression "in" Expression
+               ::= "assert" Expression "then" Expression
 
     Type       ::= "int"
                ::= "bool"

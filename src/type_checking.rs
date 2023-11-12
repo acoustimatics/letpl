@@ -11,6 +11,16 @@ pub fn let_type_of(program: &Program) -> Result<LetType, String> {
 
 fn let_type_of_expr(expr: &Expr, tenv: &mut SymbolTable<LetType>) -> Result<LetType, String> {
     match expr {
+        Expr::Assert { guard, body, .. } => {
+            let t_guard = let_type_of_expr(guard, tenv)?;
+            if !t_guard.is_bool() {
+                let msg =
+                    format!("assert guard must be type `bool` but got `{t_guard}`");
+                return Err(msg);
+            }
+            let_type_of_expr(body, tenv)
+        }
+
         Expr::Call(proc, arg) => {
             let t_proc = let_type_of_expr(proc, tenv)?;
             let Some((t_param, t_body)) = t_proc.as_proc() else {

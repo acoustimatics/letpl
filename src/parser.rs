@@ -1,8 +1,8 @@
 //! A recursive decent letpl parser.
 
-use crate::ast::{Program, Expr};
+use crate::ast::{Expr, Program};
+use crate::scanner::{Scanner, Token, TokenTag};
 use crate::types::LetType;
-use crate::scanner::{Token, Scanner};
 
 type ExprResult = Result<Box<Expr>, String>;
 
@@ -29,82 +29,97 @@ impl<'a> Parser<'a> {
         Ok(())
     }
 
-    fn expect(&mut self, expected: Token) -> Result<(), String> {
-        if self.current == expected {
+    fn expect(&mut self, expected: TokenTag) -> Result<(), String> {
+        if self.current.tag == expected {
             self.advance()?;
             Ok(())
         } else {
-            let message = format!("expected `{:}` but got `{:}`", expected, self.current);
+            let message = format!("expected `{:}` but got `{:}`", expected, self.current.tag);
             Err(message)
         }
     }
 
     fn expect_identifer(&mut self) -> Result<String, String> {
-        if let Token::Identifier(name) = &self.current {
+        if let TokenTag::Identifier(name) = &self.current.tag {
             let name = name.clone();
             self.advance()?;
             Ok(name)
         } else {
-            let msg = format!("expected identifier but found {:}", self.current);
+            let msg = format!("expected identifier but found {:}", self.current.tag);
             Err(msg)
         }
     }
 
     fn program(&mut self) -> Result<Program, String> {
         let expr = self.expr()?;
-        self.expect(Token::Eof)?;
+        self.expect(TokenTag::Eof)?;
         Ok(Program { expr })
     }
 
     fn expr(&mut self) -> ExprResult {
-        match &self.current {
-            Token::Number(x) => {
+        match &self.current.tag {
+            TokenTag::Number(x) => {
                 let x = *x;
                 self.advance()?;
                 Ok(Box::new(Expr::Const(x)))
             }
-            Token::MinusSign => self.diff(),
-            Token::IsZero => self.is_zero(),
-            Token::If => self.if_expr(),
-            Token::Identifier(var) => {
+            TokenTag::MinusSign => self.diff(),
+            TokenTag::IsZero => self.is_zero(),
+            TokenTag::Assert => self.assert(),
+            TokenTag::If => self.if_expr(),
+            TokenTag::Identifier(var) => {
                 let var = var.clone();
                 self.advance()?;
                 Ok(Box::new(Expr::Var(var)))
             }
-            Token::Let => self.let_expr(),
-            Token::LetRec => self.let_rec_expr(),
-            Token::Proc => self.proc_expr(),
-            Token::LeftParen => self.call_expr(),
+            TokenTag::Let => self.let_expr(),
+            TokenTag::LetRec => self.let_rec_expr(),
+            TokenTag::Proc => self.proc_expr(),
+            TokenTag::LeftParen => self.call_expr(),
             unexpected_token => Err(format!("unexpected token `{unexpected_token:}`")),
         }
     }
 
     fn diff(&mut self) -> ExprResult {
         self.advance()?;
-        self.expect(Token::LeftParen)?;
+        self.expect(TokenTag::LeftParen)?;
         let left_expr = self.expr()?;
-        self.expect(Token::Comma)?;
+        self.expect(TokenTag::Comma)?;
         let right_expr = self.expr()?;
-        self.expect(Token::RightParen)?;
+        self.expect(TokenTag::RightParen)?;
 
         Ok(Box::new(Expr::Diff(left_expr, right_expr)))
     }
 
     fn is_zero(&mut self) -> ExprResult {
         self.advance()?;
-        self.expect(Token::LeftParen)?;
+        self.expect(TokenTag::LeftParen)?;
         let expr = self.expr()?;
-        self.expect(Token::RightParen)?;
+        self.expect(TokenTag::RightParen)?;
 
         Ok(Box::new(Expr::IsZero(expr)))
+    }
+
+    fn assert(&mut self) -> ExprResult {
+        let line = self.current.line;
+        self.advance()?;
+        let guard = self.expr()?;
+        self.expect(TokenTag::Then)?;
+        let body = self.expr()?;
+
+        Ok(Box::new(Expr::Assert {
+            line,
+            guard,
+            body,
+        }))
     }
 
     fn if_expr(&mut self) -> ExprResult {
         self.advance()?;
         let condition = self.expr()?;
-        self.expect(Token::Then)?;
+        self.expect(TokenTag::Then)?;
         let consequence = self.expr()?;
-        self.expect(Token::Else)?;
+        self.expect(TokenTag::Else)?;
         let alternative = self.expr()?;
 
         Ok(Box::new(Expr::If(condition, consequence, alternative)))
@@ -113,9 +128,9 @@ impl<'a> Parser<'a> {
     fn let_expr(&mut self) -> ExprResult {
         self.advance()?;
         let var = self.expect_identifer()?;
-        self.expect(Token::Equal)?;
+        self.expect(TokenTag::Equal)?;
         let expr = self.expr()?;
-        self.expect(Token::In)?;
+        self.expect(TokenTag::In)?;
         let body = self.expr()?;
 
         Ok(Box::new(Expr::Let(var, expr, body)))
@@ -125,13 +140,13 @@ impl<'a> Parser<'a> {
         self.advance()?;
         let result_type = self.parse_type()?;
         let name = self.expect_identifer()?;
-        self.expect(Token::LeftParen)?;
+        self.expect(TokenTag::LeftParen)?;
         let var = self.expect_identifer()?;
-        self.expect(Token::Colon)?;
+        self.expect(TokenTag::Colon)?;
         let var_type = self.parse_type()?;
-        self.expect(Token::RightParen)?;
+        self.expect(TokenTag::RightParen)?;
         let proc_body = self.expr()?;
-        self.expect(Token::In)?;
+        self.expect(TokenTag::In)?;
         let let_body = self.expr()?;
 
         Ok(Box::new(Expr::LetRec {
@@ -146,11 +161,11 @@ impl<'a> Parser<'a> {
 
     fn proc_expr(&mut self) -> ExprResult {
         self.advance()?;
-        self.expect(Token::LeftParen)?;
+        self.expect(TokenTag::LeftParen)?;
         let var = self.expect_identifer()?;
-        self.expect(Token::Colon)?;
+        self.expect(TokenTag::Colon)?;
         let ty = self.parse_type()?;
-        self.expect(Token::RightParen)?;
+        self.expect(TokenTag::RightParen)?;
         let body = self.expr()?;
 
         Ok(Box::new(Expr::Proc(var, ty, body)))
@@ -160,30 +175,30 @@ impl<'a> Parser<'a> {
         self.advance()?;
         let operator = self.expr()?;
         let operand = self.expr()?;
-        self.expect(Token::RightParen)?;
+        self.expect(TokenTag::RightParen)?;
 
         Ok(Box::new(Expr::Call(operator, operand)))
     }
 
     fn parse_type(&mut self) -> Result<LetType, String> {
-        match self.current {
-            Token::Int => {
+        match self.current.tag {
+            TokenTag::Int => {
                 self.advance()?;
                 Ok(LetType::new_int())
             }
-            Token::Bool => {
+            TokenTag::Bool => {
                 self.advance()?;
                 Ok(LetType::new_bool())
             }
-            Token::LeftParen => {
+            TokenTag::LeftParen => {
                 self.advance()?;
                 let var_type = self.parse_type()?;
-                self.expect(Token::Arrow)?;
+                self.expect(TokenTag::Arrow)?;
                 let result_type = self.parse_type()?;
-                self.expect(Token::RightParen)?;
+                self.expect(TokenTag::RightParen)?;
                 Ok(LetType::new_proc(var_type, result_type))
             }
-            _ => Err(format!("unexpected token `{}`", self.current)),
+            _ => Err(format!("unexpected token `{}`", self.current.tag)),
         }
     }
 }

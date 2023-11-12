@@ -34,6 +34,16 @@ fn compile_expr(
     chunk: &mut Chunk,
 ) -> Result<(), String> {
     match expr {
+        Expr::Assert {
+            line,
+            guard,
+            body,
+        } => {
+            compile_expr(guard, scope, ExprPos::Operand, chunk)?;
+            chunk.emit(Op::Assert { line: *line });
+            compile_expr(body, scope, ExprPos::Tail, chunk)?;
+        }
+
         Expr::Capture(i) => {
             chunk.emit(Op::PushCapture(*i));
         }

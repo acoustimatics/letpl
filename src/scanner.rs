@@ -3,10 +3,11 @@
 use std::fmt;
 use std::str::Chars;
 
-/// Represents a token in a source text.
+/// Represents a token's type in a source text.
 #[derive(PartialEq)]
-pub enum Token {
+pub enum TokenTag {
     Arrow,
+    Assert,
     Bool,
     Colon,
     Comma,
@@ -28,33 +29,50 @@ pub enum Token {
     IsZero,
 }
 
-impl fmt::Display for Token {
+impl fmt::Display for TokenTag {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let token_str = match self {
-            Token::Arrow => "->",
-            Token::Bool => "bool",
-            Token::Colon => ":",
-            Token::Comma => ",",
-            Token::Else => "else",
-            Token::Eof => "EOF",
-            Token::Equal => "=",
-            Token::Identifier(id) => {
+            TokenTag::Arrow => "->",
+            TokenTag::Assert => "assert",
+            TokenTag::Bool => "bool",
+            TokenTag::Colon => ":",
+            TokenTag::Comma => ",",
+            TokenTag::Else => "else",
+            TokenTag::Eof => "EOF",
+            TokenTag::Equal => "=",
+            TokenTag::Identifier(id) => {
                 return write!(f, "identifier({id})");
             }
-            Token::If => "if",
-            Token::In => "in",
-            Token::Int => "int",
-            Token::LeftParen => "(",
-            Token::Let => "let",
-            Token::LetRec => "letrec",
-            Token::Proc => "proc",
-            Token::MinusSign => "-",
-            Token::Number(_) => "number",
-            Token::RightParen => ")",
-            Token::Then => "then",
-            Token::IsZero => "zero?",
+            TokenTag::If => "if",
+            TokenTag::In => "in",
+            TokenTag::Int => "int",
+            TokenTag::LeftParen => "(",
+            TokenTag::Let => "let",
+            TokenTag::LetRec => "letrec",
+            TokenTag::Proc => "proc",
+            TokenTag::MinusSign => "-",
+            TokenTag::Number(_) => "number",
+            TokenTag::RightParen => ")",
+            TokenTag::Then => "then",
+            TokenTag::IsZero => "zero?",
         };
         write!(f, "{token_str}")
+    }
+}
+
+/// A token from a source text.
+pub struct Token {
+    /// The token's type.
+    pub tag: TokenTag,
+
+    /// The line in the source text on which the token starts.
+    pub line: usize,
+}
+
+impl Token {
+    /// A token constructor function.
+    pub fn new(tag: TokenTag, line: usize) -> Self {
+        Self { tag, line }
     }
 }
 
@@ -62,6 +80,7 @@ impl fmt::Display for Token {
 pub struct Scanner<'a> {
     chars: Chars<'a>,
     current: Option<char>,
+    line: usize,
 }
 
 impl<'a> Scanner<'a> {
@@ -71,12 +90,16 @@ impl<'a> Scanner<'a> {
         let mut scanner = Scanner {
             chars: src.chars(),
             current: None,
+            line: 1,
         };
         scanner.advance();
         scanner
     }
 
     fn advance(&mut self) {
+        if let Some('\n') = self.current {
+            self.line += 1;
+        }
         self.current = self.chars.next();
     }
 
@@ -101,70 +124,49 @@ impl<'a> Scanner<'a> {
     pub fn next_token(&mut self) -> Result<Token, String> {
         self.skip_whitespace_comments();
 
-        // Handle end of code.
         if self.current.is_none() {
-            return Ok(Token::Eof);
+            Ok(Token::new(TokenTag::Eof, self.line))
+        } else if self.current.map_or(false, is_alpha) {
+            self.identifier()
+        } else if self.current.map_or(false, is_digit) {
+            self.number_literal()
+        } else {
+            self.symbol()
+        }
+    }
+
+    fn identifier(&mut self) -> Result<Token, String> {
+        let line = self.line;
+
+        let mut s = String::new();
+        while self
+            .current
+            .map_or(false, |c| is_alpha(c) || is_digit(c) || c == '?')
+        {
+            self.collect(&mut s);
         }
 
-        // Handle identifiers and keywords.
-        if self.current.map_or(false, is_alpha) {
-            let mut s = String::new();
-            while self
-                .current
-                .map_or(false, |c| is_alpha(c) || is_digit(c) || c == '?')
-            {
-                self.collect(&mut s);
-            }
-
-            let token = match s.as_ref() {
-                "bool" => Token::Bool,
-                "else" => Token::Else,
-                "if" => Token::If,
-                "in" => Token::In,
-                "int" => Token::Int,
-                "let" => Token::Let,
-                "letrec" => Token::LetRec,
-                "proc" => Token::Proc,
-                "then" => Token::Then,
-                "zero?" => Token::IsZero,
-                _ => Token::Identifier(s),
-            };
-
-            return Ok(token);
-        }
-
-        // Handle a number literal.
-        if self.current.map_or(false, is_digit) {
-            return self.number_literal();
-        }
-
-        // Handle operators.
-        let token = match self.current.unwrap() {
-            '(' => Token::LeftParen,
-            ')' => Token::RightParen,
-            ':' => Token::Colon,
-            ',' => Token::Comma,
-            '-' => Token::MinusSign,
-            '=' => Token::Equal,
-            c => return Err(format!("unexpected character '{c}'")),
+        let tag = match s.as_ref() {
+            "assert" => TokenTag::Assert,
+            "bool" => TokenTag::Bool,
+            "else" => TokenTag::Else,
+            "if" => TokenTag::If,
+            "in" => TokenTag::In,
+            "int" => TokenTag::Int,
+            "let" => TokenTag::Let,
+            "letrec" => TokenTag::LetRec,
+            "proc" => TokenTag::Proc,
+            "then" => TokenTag::Then,
+            "zero?" => TokenTag::IsZero,
+            _ => TokenTag::Identifier(s),
         };
 
-        // Advance past the last character in the operator.
-        self.advance();
-
-        // Check for two character operators.
-        let token = match self.current {
-            Some('>') if token == Token::MinusSign => {
-                self.advance();
-                Token::Arrow
-            }
-            _ => token,
-        };
-
-        Ok(token)
+        return Ok(Token::new(tag, line));
     }
 
     fn number_literal(&mut self) -> Result<Token, String> {
+        let line = self.line;
+
         let mut s = String::new();
 
         while self.current.map_or(false, is_digit) {
@@ -172,9 +174,38 @@ impl<'a> Scanner<'a> {
         }
 
         match s.parse() {
-            Ok(x) => Ok(Token::Number(x)),
+            Ok(x) => Ok(Token::new(TokenTag::Number(x), line)),
             Err(_) => Err(format!("'{s}' cannot be converted to a number")),
         }
+    }
+
+    fn symbol(&mut self) -> Result<Token, String> {
+        let line = self.line;
+
+        // Handle operators.
+        let tag = match self.current.unwrap() {
+            '(' => TokenTag::LeftParen,
+            ')' => TokenTag::RightParen,
+            ':' => TokenTag::Colon,
+            ',' => TokenTag::Comma,
+            '-' => TokenTag::MinusSign,
+            '=' => TokenTag::Equal,
+            c => return Err(format!("unexpected character '{c}'")),
+        };
+
+        // Advance past the last character in the operator.
+        self.advance();
+
+        // Check for two character operators.
+        let tag = match self.current {
+            Some('>') if tag == TokenTag::MinusSign => {
+                self.advance();
+                TokenTag::Arrow
+            }
+            _ => tag,
+        };
+
+        Ok(Token::new(tag, line))
     }
 
     fn collect(&mut self, s: &mut String) {
