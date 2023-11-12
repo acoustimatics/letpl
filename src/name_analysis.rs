@@ -8,6 +8,7 @@ pub struct Program {
 }
 
 pub enum Expr {
+    /// An expression which guards its body expression by a test expression.
     Assert {
         line: usize,
         guard: Box<Expr>,

@@ -9,6 +9,7 @@ pub struct Program {
 
 /// Represents an Expression node in an AST.
 pub enum Expr {
+    /// An expression which guards its body expression by a test expression.
     Assert {
         line: usize,
         guard: Box<Expr>,
