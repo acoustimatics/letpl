@@ -11,11 +11,11 @@ pub fn let_type_of(program: &Program) -> Result<LetType, String> {
 
 fn let_type_of_expr(expr: &Expr, tenv: &mut SymbolTable<LetType>) -> Result<LetType, String> {
     match expr {
-        Expr::Assert { asserted, body, .. } => {
-            let t_asserted = let_type_of_expr(asserted, tenv)?;
-            if !t_asserted.is_bool() {
+        Expr::Assert { guard, body, .. } => {
+            let t_guard = let_type_of_expr(guard, tenv)?;
+            if !t_guard.is_bool() {
                 let msg =
-                    format!("asserted expression must be of type `bool` but got `{t_asserted}`");
+                    format!("assert guard must be type `bool` but got `{t_guard}`");
                 return Err(msg);
             }
             let_type_of_expr(body, tenv)

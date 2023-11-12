@@ -36,10 +36,10 @@ fn compile_expr(
     match expr {
         Expr::Assert {
             line,
-            asserted,
+            guard,
             body,
         } => {
-            compile_expr(asserted, scope, ExprPos::Operand, chunk)?;
+            compile_expr(guard, scope, ExprPos::Operand, chunk)?;
             chunk.emit(Op::Assert { line: *line });
             compile_expr(body, scope, ExprPos::Tail, chunk)?;
         }

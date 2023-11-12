@@ -11,7 +11,7 @@ pub struct Program {
 pub enum Expr {
     Assert {
         line: usize,
-        asserted: Box<Expr>,
+        guard: Box<Expr>,
         body: Box<Expr>,
     },
 

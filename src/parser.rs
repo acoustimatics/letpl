@@ -103,13 +103,13 @@ impl<'a> Parser<'a> {
     fn assert(&mut self) -> ExprResult {
         let line = self.current.line;
         self.advance()?;
-        let asserted = self.expr()?;
+        let guard = self.expr()?;
         self.expect(TokenTag::Then)?;
         let body = self.expr()?;
 
         Ok(Box::new(Expr::Assert {
             line,
-            asserted,
+            guard,
             body,
         }))
     }
