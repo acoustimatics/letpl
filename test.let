@@ -10,4 +10,6 @@ let add_one = proc (x : int)
     -(x, -(0, 1))
 in
 
-(send_one add_one)
+let result = (send_one add_one) in
+assert zero?( -(result, 2) ) then
+result

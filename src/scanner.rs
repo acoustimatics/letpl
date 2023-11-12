@@ -7,6 +7,7 @@ use std::str::Chars;
 #[derive(PartialEq)]
 pub enum TokenTag {
     Arrow,
+    Assert,
     Bool,
     Colon,
     Comma,
@@ -32,6 +33,7 @@ impl fmt::Display for TokenTag {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let token_str = match self {
             TokenTag::Arrow => "->",
+            TokenTag::Assert => "assert",
             TokenTag::Bool => "bool",
             TokenTag::Colon => ":",
             TokenTag::Comma => ",",
@@ -145,6 +147,7 @@ impl<'a> Scanner<'a> {
         }
 
         let tag = match s.as_ref() {
+            "assert" => TokenTag::Assert,
             "bool" => TokenTag::Bool,
             "else" => TokenTag::Else,
             "if" => TokenTag::If,

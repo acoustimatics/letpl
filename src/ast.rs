@@ -9,6 +9,12 @@ pub struct Program {
 
 /// Represents an Expression node in an AST.
 pub enum Expr {
+    Assert {
+        line: usize,
+        asserted: Box<Expr>,
+        body: Box<Expr>,
+    },
+
     /// Represents a constant numerical expression.
     Const(i64),
 

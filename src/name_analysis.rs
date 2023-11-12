@@ -8,6 +8,12 @@ pub struct Program {
 }
 
 pub enum Expr {
+    Assert {
+        line: usize,
+        asserted: Box<Expr>,
+        body: Box<Expr>,
+    },
+
     Call(Box<Expr>, Box<Expr>),
 
     Capture(usize),
@@ -217,6 +223,21 @@ pub fn resolve_names(program: &ast::Program) -> Result<Program, String> {
 
 fn resolve_names_expr(expr: &ast::Expr, state: &mut CompilerState) -> Result<Box<Expr>, String> {
     match expr {
+        ast::Expr::Assert {
+            line,
+            asserted,
+            body,
+        } => {
+            let asserted = resolve_names_expr(asserted, state)?;
+            state.pop();
+            let body = resolve_names_expr(body, state)?;
+            Ok(Box::new(Expr::Assert {
+                line: *line,
+                asserted,
+                body,
+            }))
+        }
+
         ast::Expr::Call(proc, arg) => {
             let proc = resolve_names_expr(proc, state)?;
             let arg = resolve_names_expr(arg, state)?;

@@ -78,6 +78,12 @@ pub enum Capture {
 /// Represents a VM operation.
 #[derive(Debug)]
 pub enum Op {
+    /// Pop a Boolean from the stack. If the value is false then halt execution
+    /// and include the line number in the error message.
+    Assert {
+        line: usize,
+    },
+
     /// Call a procedure. Call expects two values at the on the stack: at the
     /// top an argument and next a procedure. Save he current op index and
     /// environment to the call stack, then set the instruction index and
@@ -163,6 +169,13 @@ pub fn run(program: &[Op]) -> Result<Value, String> {
         next_op += 1;
 
         match op {
+            Op::Assert { line } => {
+                if !pop!(stack).as_bool()? {
+                    let msg = format!("Assert at line {line}");
+                    return Err(msg.to_string());
+                }
+            }
+
             Op::Call => {
                 let calling_frame = Frame::new(next_op, frame_stack_index, captures);
                 call_stack.push(calling_frame);

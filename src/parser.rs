@@ -1,8 +1,8 @@
 //! A recursive decent letpl parser.
 
-use crate::ast::{Program, Expr};
+use crate::ast::{Expr, Program};
+use crate::scanner::{Scanner, Token, TokenTag};
 use crate::types::LetType;
-use crate::scanner::{TokenTag, Token, Scanner};
 
 type ExprResult = Result<Box<Expr>, String>;
 
@@ -65,6 +65,7 @@ impl<'a> Parser<'a> {
             }
             TokenTag::MinusSign => self.diff(),
             TokenTag::IsZero => self.is_zero(),
+            TokenTag::Assert => self.assert(),
             TokenTag::If => self.if_expr(),
             TokenTag::Identifier(var) => {
                 let var = var.clone();
@@ -97,6 +98,20 @@ impl<'a> Parser<'a> {
         self.expect(TokenTag::RightParen)?;
 
         Ok(Box::new(Expr::IsZero(expr)))
+    }
+
+    fn assert(&mut self) -> ExprResult {
+        let line = self.current.line;
+        self.advance()?;
+        let asserted = self.expr()?;
+        self.expect(TokenTag::Then)?;
+        let body = self.expr()?;
+
+        Ok(Box::new(Expr::Assert {
+            line,
+            asserted,
+            body,
+        }))
     }
 
     fn if_expr(&mut self) -> ExprResult {
