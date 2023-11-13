@@ -31,6 +31,8 @@ pub enum Expr {
 
     Let(Box<Expr>, Box<Expr>),
 
+    LiteralBool(bool),
+
     Local(usize),
 
     Proc(Box<Expr>, Vec<Cap>),
@@ -299,6 +301,11 @@ fn resolve_names_expr(expr: &ast::Expr, state: &mut CompilerState) -> Result<Box
             let let_body = resolve_names_expr(let_body, state)?;
             state.end_scope();
             Ok(Box::new(Expr::Let(proc, let_body)))
+        }
+
+        ast::Expr::LiteralBool(value) => {
+            state.push();
+            Ok(Box::new(Expr::LiteralBool(*value)))
         }
 
         ast::Expr::Proc(var, _, body) => resolve_names_proc("", var, body, state),

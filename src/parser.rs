@@ -63,6 +63,14 @@ impl<'a> Parser<'a> {
                 self.advance()?;
                 Ok(Box::new(Expr::Const(x)))
             }
+            TokenTag::True => {
+                self.advance()?;
+                Ok(Box::new(Expr::LiteralBool(true)))
+            }
+            TokenTag::False => {
+                self.advance()?;
+                Ok(Box::new(Expr::LiteralBool(false)))
+            }
             TokenTag::MinusSign => self.diff(),
             TokenTag::IsZero => self.is_zero(),
             TokenTag::Assert => self.assert(),

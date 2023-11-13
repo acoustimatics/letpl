@@ -88,6 +88,8 @@ fn let_type_of_expr(expr: &Expr, tenv: &mut SymbolTable<LetType>) -> Result<LetT
             Ok(t_body)
         }
 
+        Expr::LiteralBool(_) => Ok(LetType::new_bool()),
+
         Expr::Proc(var, t_var, body) => {
             tenv.push(var, t_var);
             let t_body = let_type_of_expr(body, tenv)?;

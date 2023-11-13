@@ -14,6 +14,7 @@ pub enum TokenTag {
     Else,
     Eof,
     Equal,
+    False,
     Identifier(String),
     If,
     In,
@@ -26,6 +27,7 @@ pub enum TokenTag {
     Number(i64),
     RightParen,
     Then,
+    True,
     IsZero,
 }
 
@@ -40,6 +42,7 @@ impl fmt::Display for TokenTag {
             TokenTag::Else => "else",
             TokenTag::Eof => "EOF",
             TokenTag::Equal => "=",
+            TokenTag::False => "false",
             TokenTag::Identifier(id) => {
                 return write!(f, "identifier({id})");
             }
@@ -54,6 +57,7 @@ impl fmt::Display for TokenTag {
             TokenTag::Number(_) => "number",
             TokenTag::RightParen => ")",
             TokenTag::Then => "then",
+            TokenTag::True => "true",
             TokenTag::IsZero => "zero?",
         };
         write!(f, "{token_str}")
@@ -150,6 +154,7 @@ impl<'a> Scanner<'a> {
             "assert" => TokenTag::Assert,
             "bool" => TokenTag::Bool,
             "else" => TokenTag::Else,
+            "false" => TokenTag::False,
             "if" => TokenTag::If,
             "in" => TokenTag::In,
             "int" => TokenTag::Int,
@@ -157,6 +162,7 @@ impl<'a> Scanner<'a> {
             "letrec" => TokenTag::LetRec,
             "proc" => TokenTag::Proc,
             "then" => TokenTag::Then,
+            "true" => TokenTag::True,
             "zero?" => TokenTag::IsZero,
             _ => TokenTag::Identifier(s),
         };
