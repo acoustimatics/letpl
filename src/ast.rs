@@ -35,6 +35,9 @@ pub enum Expr {
     /// Represent an let/in expression.
     Let(String, Box<Expr>, Box<Expr>),
 
+    /// A literal bool value.
+    LiteralBool(bool),
+
     /// Represents a procedure.
     Proc(String, LetType, Box<Expr>),
 

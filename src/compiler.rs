@@ -95,6 +95,10 @@ fn compile_expr(
             compile_expr(body, scope, ExprPos::Tail, chunk)?;
         }
 
+        Expr::LiteralBool(value) => {
+            chunk.emit(Op::PushValue(Value::Boolean(*value)));
+        }
+
         Expr::Local(i) => {
             chunk.emit(Op::PushLocal(*i));
         }
