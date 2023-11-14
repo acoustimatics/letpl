@@ -1,15 +1,116 @@
-let send_one = proc (f : (int -> int))
-    (f 1)
+# letpl integration test script
+
+# Comments start with a # and extend to the end of a line.
+
+# Assert guards an expression with a test.
+assert true then
+
+# `let` binds a value to a name and introduces a new scope.
+let is_true = true in
+assert is_true then
+
+# `if` starts a conditional expression.
+assert
+    if is_true then
+        true
+    else
+        false
+then
+
+# `proc` creates a new procedure which map one input to an output.
+# Procedures are values. Use `let` to bind one to a name.
+# Procedures are called with `(` and `)`.
+let not = proc (p: bool)
+    if p then
+        false
+    else
+        true
+in
+assert (not false) then
+
+# `zero?` tests if an integer expression is zero.
+let x = 0 in
+assert zero?(x) then
+
+# `let` will mask [right word?] previous bindings.
+let x = 100 in
+assert (not zero?(x)) then
+
+# `-` subtracts two integers.
+let x = -(x, 100) in
+assert zero?(x) then
+
+# Procedures can be closures.
+let one_hundred = 100 in
+let eq_one_hundred = proc (x: int)
+    zero?(-(x, one_hundred))
+in
+assert (eq_one_hundred 100) then
+
+# Using closures, multi-input procedures are chains of `proc`.
+let add = proc (x: int) proc (y: int)
+    -(x, -(0, y))
+in
+let sum = ((add 75) 25) in
+assert (eq_one_hundred sum) then
+
+# You can partially apply a chained of procedures to get new
+# procedures.
+let add_seventy_five = (add 75) in
+assert (eq_one_hundred (add_seventy_five 25)) then
+
+# Let's create a proc to tell if two integers are equal.
+let eq? = proc (left: int) proc (right: int)
+    let compare = -(left, right) in
+    zero?(compare)
 in
 
-letrec int send_two(f: (int -> int))
-    (f 2)
+# `letrec` is for recursive procedures. Here is the requisite fib.
+letrec int fib(n: int)
+    let n_minus_one = -(n, 1) in
+    if zero?(n_minus_one) then
+        1
+    else
+        let n_minus_two = -(n, 2) in
+        if zero?(n_minus_two) then
+            1
+        else
+            let fib_n_minus_one = (fib n_minus_one) in
+            let fib_n_minus_two = (fib n_minus_two) in
+            ((add fib_n_minus_one) fib_n_minus_two)
 in
+let fib_1 = (fib 1) in
+let fib_2 = (fib 2) in
+let fib_3 = (fib 3) in
+let fib_6 = (fib 6) in
+assert ((eq? 1) fib_1) then
+assert ((eq? 1) fib_2) then
+assert ((eq? 2) fib_3) then
+assert ((eq? 8) fib_6) then
 
-let add_one = proc (x : int)
-    -(x, -(0, 1))
+# Procedures do tail call optimization.
+let gsum = proc (n: int)
+    # loop's return type must be that of the inner `proc`.
+    letrec (int->int) loop(sum: int) proc(i: int)
+        if zero?(i) then
+            sum
+        else
+            let sum = ((add i) sum) in
+            let i = -(i, 1) in
+            ((loop sum) i)
+    in
+    ((loop 0) n)
 in
+let gsum_10 = (gsum 10) in
+let gsum_100 = (gsum 100) in
+let gsum_1000 = (gsum 1000) in
+let gsum_10000 = (gsum 10000) in
+let gsum_100000 = (gsum 100000) in
+assert ((eq? 55) gsum_10) then
+assert ((eq? 5050) gsum_100) then
+assert ((eq? 500500) gsum_1000) then
+assert ((eq? 50005000) gsum_10000) then
+assert ((eq? 5000050000) gsum_100000) then
 
-let result = (send_one add_one) in
-assert zero?( -(result, 2) ) then
-result
+# All tests passed, the program evaluates to true.
+true
