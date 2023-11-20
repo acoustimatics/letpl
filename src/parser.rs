@@ -115,11 +115,7 @@ impl<'a> Parser<'a> {
         self.expect(TokenTag::Then)?;
         let body = self.expr()?;
 
-        Ok(Box::new(Expr::Assert {
-            line,
-            guard,
-            body,
-        }))
+        Ok(Box::new(Expr::Assert { line, guard, body }))
     }
 
     fn if_expr(&mut self) -> ExprResult {
