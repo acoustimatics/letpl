@@ -2,49 +2,49 @@
 
 use crate::types::LetType;
 
-/// Represents a Program node in an AST.
+/// A program node in an AST.
 pub struct Program {
+    /// The program's expression.
     pub expr: Box<Expr>,
 }
 
-/// Represents an Expression node in an AST.
+/// An expression node in an AST.
 pub enum Expr {
-    /// An expression which guards its body expression by a test expression.
+    /// An expression guarded by a test expression.
     Assert {
         line: usize,
         guard: Box<Expr>,
         body: Box<Expr>,
     },
 
-    /// Represents a constant numerical expression.
+    /// A constant numerical expression.
     Const(i64),
 
-    /// Represents an expression that takes the difference of two
-    /// sub-expressions.
+    /// An expression that subtracts two sub-expressions.
     Diff(Box<Expr>, Box<Expr>),
 
-    /// Represents an expression that test if a sub-expression is zero.
+    /// An expression that test if a sub-expression is zero.
     IsZero(Box<Expr>),
 
-    /// Represents and if/then/else expression.
+    /// A conditional expression.
     If(Box<Expr>, Box<Expr>, Box<Expr>),
 
-    /// Represents a variable lookup expression.
+    /// A variable lookup expression.
     Var(String),
 
-    /// Represent an let/in expression.
+    /// An expression with a name bound to a value.
     Let(String, Box<Expr>, Box<Expr>),
 
-    /// A literal bool value.
+    /// A literal Boolean expression.
     LiteralBool(bool),
 
-    /// Represents a procedure.
+    /// A procedure definition expression.
     Proc(String, LetType, Box<Expr>),
 
-    /// Represents a procedure call.
+    /// A procedure call expression.
     Call(Box<Expr>, Box<Expr>),
 
-    /// Represents a recursve procedure.
+    /// A recursive procedure definition expression.
     LetRec {
         result_type: LetType,
         name: String,
