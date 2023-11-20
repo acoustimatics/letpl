@@ -1,47 +1,8 @@
 //! Analysis of how identifier names are used in an letpl program.
 
 use crate::ast;
+use crate::ast::nameless;
 use crate::symbol_table::SymbolTable;
-
-pub struct Program {
-    pub expr: Box<Expr>,
-}
-
-pub enum Expr {
-    /// An expression which guards its body expression by a test expression.
-    Assert {
-        line: usize,
-        guard: Box<Expr>,
-        body: Box<Expr>,
-    },
-
-    Call(Box<Expr>, Box<Expr>),
-
-    Capture(usize),
-
-    Const(i64),
-
-    Diff(Box<Expr>, Box<Expr>),
-
-    Global(usize),
-
-    IsZero(Box<Expr>),
-
-    If(Box<Expr>, Box<Expr>, Box<Expr>),
-
-    Let(Box<Expr>, Box<Expr>),
-
-    LiteralBool(bool),
-
-    Local(usize),
-
-    Proc(Box<Expr>, Vec<Cap>),
-}
-
-pub enum Cap {
-    Local(usize),
-    Capture(usize),
-}
 
 fn lookup<'a>(bindings: &'a Option<SymbolTable<usize>>, lookup_name: &str) -> Option<&'a usize> {
     match bindings {
@@ -218,23 +179,22 @@ impl CompilerState {
     }
 }
 
-pub fn resolve_names(program: &ast::Program) -> Result<Program, String> {
+pub fn resolve_names(program: &ast::Program) -> Result<nameless::Program, String> {
     let mut state = CompilerState::new();
     let expr = resolve_names_expr(&program.expr, &mut state)?;
-    Ok(Program { expr })
+    Ok(nameless::Program { expr })
 }
 
-fn resolve_names_expr(expr: &ast::Expr, state: &mut CompilerState) -> Result<Box<Expr>, String> {
+fn resolve_names_expr(
+    expr: &ast::Expr,
+    state: &mut CompilerState,
+) -> Result<Box<nameless::Expr>, String> {
     match expr {
-        ast::Expr::Assert {
-            line,
-            guard,
-            body,
-        } => {
+        ast::Expr::Assert { line, guard, body } => {
             let guard = resolve_names_expr(guard, state)?;
             state.pop();
             let body = resolve_names_expr(body, state)?;
-            Ok(Box::new(Expr::Assert {
+            Ok(Box::new(nameless::Expr::Assert {
                 line: *line,
                 guard,
                 body,
@@ -247,12 +207,12 @@ fn resolve_names_expr(expr: &ast::Expr, state: &mut CompilerState) -> Result<Box
             state.pop();
             state.pop();
             state.push();
-            Ok(Box::new(Expr::Call(proc, arg)))
+            Ok(Box::new(nameless::Expr::Call(proc, arg)))
         }
 
         ast::Expr::Const(x) => {
             state.push();
-            Ok(Box::new(Expr::Const(*x)))
+            Ok(Box::new(nameless::Expr::Const(*x)))
         }
 
         ast::Expr::Diff(lhs, rhs) => {
@@ -261,7 +221,7 @@ fn resolve_names_expr(expr: &ast::Expr, state: &mut CompilerState) -> Result<Box
             state.pop();
             state.pop();
             state.push();
-            Ok(Box::new(Expr::Diff(lhs, rhs)))
+            Ok(Box::new(nameless::Expr::Diff(lhs, rhs)))
         }
 
         ast::Expr::If(guard, consq, alt) => {
@@ -271,14 +231,14 @@ fn resolve_names_expr(expr: &ast::Expr, state: &mut CompilerState) -> Result<Box
             let alt = resolve_names_expr(alt, state)?;
             state.restore_stack();
             let consq = resolve_names_expr(consq, state)?;
-            Ok(Box::new(Expr::If(guard, consq, alt)))
+            Ok(Box::new(nameless::Expr::If(guard, consq, alt)))
         }
 
         ast::Expr::IsZero(e) => {
             let e = resolve_names_expr(e, state)?;
             state.pop();
             state.push();
-            Ok(Box::new(Expr::IsZero(e)))
+            Ok(Box::new(nameless::Expr::IsZero(e)))
         }
 
         ast::Expr::Let(var, rhs, body) => {
@@ -286,7 +246,7 @@ fn resolve_names_expr(expr: &ast::Expr, state: &mut CompilerState) -> Result<Box
             state.begin_scope(var);
             let body = resolve_names_expr(body, state)?;
             state.end_scope();
-            Ok(Box::new(Expr::Let(rhs, body)))
+            Ok(Box::new(nameless::Expr::Let(rhs, body)))
         }
 
         ast::Expr::LetRec {
@@ -300,12 +260,12 @@ fn resolve_names_expr(expr: &ast::Expr, state: &mut CompilerState) -> Result<Box
             state.begin_scope(name);
             let let_body = resolve_names_expr(let_body, state)?;
             state.end_scope();
-            Ok(Box::new(Expr::Let(proc, let_body)))
+            Ok(Box::new(nameless::Expr::Let(proc, let_body)))
         }
 
         ast::Expr::LiteralBool(value) => {
             state.push();
-            Ok(Box::new(Expr::LiteralBool(*value)))
+            Ok(Box::new(nameless::Expr::LiteralBool(*value)))
         }
 
         ast::Expr::Proc(var, _, body) => resolve_names_proc("", var, body, state),
@@ -313,13 +273,13 @@ fn resolve_names_expr(expr: &ast::Expr, state: &mut CompilerState) -> Result<Box
         ast::Expr::Var(var) => {
             if let Some(&stack_index) = state.lookup_local(var) {
                 state.push();
-                Ok(Box::new(Expr::Local(stack_index)))
+                Ok(Box::new(nameless::Expr::Local(stack_index)))
             } else if let Some(capture_index) = state.lookup_capture(var) {
                 state.push();
-                Ok(Box::new(Expr::Capture(capture_index)))
+                Ok(Box::new(nameless::Expr::Capture(capture_index)))
             } else if let Some(&stack_index) = state.globals.lookup(var) {
                 state.push();
-                Ok(Box::new(Expr::Global(stack_index)))
+                Ok(Box::new(nameless::Expr::Global(stack_index)))
             } else {
                 Err(format!("undefined name: {var}"))
             }
@@ -332,21 +292,21 @@ fn resolve_names_proc(
     var: &str,
     body: &ast::Expr,
     state: &mut CompilerState,
-) -> Result<Box<Expr>, String> {
+) -> Result<Box<nameless::Expr>, String> {
     state.begin_proc(name, var);
     let body = resolve_names_expr(body, state)?;
     let captures = state.end_proc();
-    let captures: Vec<Cap> = captures
+    let captures: Vec<nameless::Capture> = captures
         .captures
         .iter()
         .map(|c| {
             if c.is_local {
-                Cap::Local(c.index)
+                nameless::Capture::Local(c.index)
             } else {
-                Cap::Capture(c.index)
+                nameless::Capture::Capture(c.index)
             }
         })
         .collect();
     state.push();
-    Ok(Box::new(Expr::Proc(body, captures)))
+    Ok(Box::new(nameless::Expr::Proc(body, captures)))
 }

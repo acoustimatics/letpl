@@ -2,7 +2,7 @@
 
 use std::fmt;
 
-use crate::name_analysis::{self, Expr, Program};
+use crate::ast::nameless::{self, Expr, Program};
 use crate::runtime::{self, Op, Value};
 
 #[derive(Copy, Clone, PartialEq)]
@@ -34,11 +34,7 @@ fn compile_expr(
     chunk: &mut Chunk,
 ) -> Result<(), String> {
     match expr {
-        Expr::Assert {
-            line,
-            guard,
-            body,
-        } => {
+        Expr::Assert { line, guard, body } => {
             compile_expr(guard, scope, ExprPos::Operand, chunk)?;
             chunk.emit(Op::Assert { line: *line });
             compile_expr(body, scope, ExprPos::Tail, chunk)?;
@@ -111,8 +107,8 @@ fn compile_expr(
             let captures: Vec<runtime::Capture> = captures
                 .iter()
                 .map(|c| match c {
-                    name_analysis::Cap::Local(i) => runtime::Capture::Local(*i),
-                    name_analysis::Cap::Capture(i) => runtime::Capture::Capture(*i),
+                    nameless::Capture::Local(i) => runtime::Capture::Local(*i),
+                    nameless::Capture::Capture(i) => runtime::Capture::Capture(*i),
                 })
                 .collect();
             let make_proc_index = chunk.emit(Op::MakeProc(start, captures));

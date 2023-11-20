@@ -54,3 +54,47 @@ pub enum Expr {
         let_body: Box<Expr>,
     },
 }
+
+pub mod nameless {
+    //! A namless version of the AST, that is, an AST without identifiers.
+
+    pub struct Program {
+        pub expr: Box<Expr>,
+    }
+
+    pub enum Expr {
+        /// An expression which guards its body expression by a test expression.
+        Assert {
+            line: usize,
+            guard: Box<Expr>,
+            body: Box<Expr>,
+        },
+
+        Call(Box<Expr>, Box<Expr>),
+
+        Capture(usize),
+
+        Const(i64),
+
+        Diff(Box<Expr>, Box<Expr>),
+
+        Global(usize),
+
+        IsZero(Box<Expr>),
+
+        If(Box<Expr>, Box<Expr>, Box<Expr>),
+
+        Let(Box<Expr>, Box<Expr>),
+
+        LiteralBool(bool),
+
+        Local(usize),
+
+        Proc(Box<Expr>, Vec<Capture>),
+    }
+
+    pub enum Capture {
+        Local(usize),
+        Capture(usize),
+    }
+}
