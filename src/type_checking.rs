@@ -1,8 +1,7 @@
 //! Type checks a letpl program
 
-use crate::ast::{Expr, Program};
+use crate::ast::{Expr, LetType, Program};
 use crate::symbol_table::SymbolTable;
-use crate::types::LetType;
 
 pub fn let_type_of(program: &Program) -> Result<LetType, String> {
     let mut tenv = SymbolTable::new();

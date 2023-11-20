@@ -8,14 +8,13 @@ mod runtime;
 mod scanner;
 mod symbol_table;
 mod type_checking;
-mod types;
 
 use std::error::Error;
 use std::io::Write;
 use std::{env, fs, io};
 
+use ast::LetType;
 use runtime::Value;
-use types::LetType;
 
 type EvalResult = Result<(Value, LetType), Box<dyn Error>>;
 
