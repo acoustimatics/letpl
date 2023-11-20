@@ -40,30 +40,22 @@ assert (not zero?(x)) then
 let x = -(x, 100) in
 assert zero?(x) then
 
-# Procedures can be closures.
-let one_hundred = 100 in
-let eq_one_hundred = proc (x: int)
-    zero?(-(x, one_hundred))
-in
-assert (eq_one_hundred 100) then
-
 # Using closures, multi-input procedures are chains of `proc`.
-let add = proc (x: int) proc (y: int)
-    -(x, -(0, y))
-in
-let sum = ((add 75) 25) in
-assert (eq_one_hundred sum) then
-
-# You can partially apply a chained of procedures to get new
-# procedures.
-let add_seventy_five = (add 75) in
-assert (eq_one_hundred (add_seventy_five 25)) then
-
-# Let's create a proc to tell if two integers are equal.
 let eq? = proc (left: int) proc (right: int)
     let compare = -(left, right) in
     zero?(compare)
 in
+
+let add = proc (x: int) proc (y: int)
+    -(x, -(0, y))
+in
+let sum = ((add 75) 25) in
+assert ((eq? 100) sum) then
+
+# You can partially apply a chained of procedures to get new
+# procedures.
+let add_seventy_five = (add 75) in
+assert ((eq? 100) (add_seventy_five 25)) then
 
 # `letrec` is for recursive procedures. Here is the requisite fib.
 letrec int fib(n: int)
