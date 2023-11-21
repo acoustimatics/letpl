@@ -1,14 +1,14 @@
 //! Type checks a letpl program
 
 use crate::ast::{Expr, Program, Type};
-use crate::symbol_table::SymbolTable;
+use crate::table::Table;
 
 pub fn let_type_of(program: &Program) -> Result<Type, String> {
-    let mut tenv = SymbolTable::new();
+    let mut tenv = Table::new();
     let_type_of_expr(&program.expr, &mut tenv)
 }
 
-fn let_type_of_expr(expr: &Expr, tenv: &mut SymbolTable<Type>) -> Result<Type, String> {
+fn let_type_of_expr(expr: &Expr, tenv: &mut Table<Type>) -> Result<Type, String> {
     match expr {
         Expr::Assert { test, body, .. } => {
             let t_guard = let_type_of_expr(test, tenv)?;
@@ -84,7 +84,7 @@ fn let_type_of_expr(expr: &Expr, tenv: &mut SymbolTable<Type>) -> Result<Type, S
 
         Expr::Let { name, expr, body } => {
             let t_expr = let_type_of_expr(expr, tenv)?;
-            tenv.push(name, &t_expr);
+            tenv.push(name.clone(), t_expr);
             let t_body = let_type_of_expr(body, tenv)?;
             tenv.pop();
             Ok(t_body)
@@ -93,7 +93,7 @@ fn let_type_of_expr(expr: &Expr, tenv: &mut SymbolTable<Type>) -> Result<Type, S
         Expr::LiteralBool(_) => Ok(Type::new_bool()),
 
         Expr::Proc { param, body } => {
-            tenv.push(&param.name, &param.t);
+            tenv.push(param.name.clone(), param.t.clone());
             let t_body = let_type_of_expr(body, tenv)?;
             tenv.pop();
             let t_proc = Type::new_proc(param.t.clone(), t_body);
@@ -108,8 +108,8 @@ fn let_type_of_expr(expr: &Expr, tenv: &mut SymbolTable<Type>) -> Result<Type, S
             let_body,
         } => {
             let t_proc = Type::new_proc(param.t.clone(), t_result.clone());
-            tenv.push(name, &t_proc);
-            tenv.push(&param.name, &param.t);
+            tenv.push(name.clone(), t_proc);
+            tenv.push(param.name.clone(), param.t.clone());
             let t_body = let_type_of_expr(proc_body, tenv)?;
             if t_body != *t_result {
                 let msg =

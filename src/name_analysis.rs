@@ -2,9 +2,9 @@
 
 use crate::ast;
 use crate::ast::nameless::{self, StackOffset};
-use crate::symbol_table::SymbolTable;
+use crate::table::Table;
 
-fn lookup<'a, T: Clone>(bindings: &'a Option<SymbolTable<T>>, lookup_name: &str) -> Option<&'a T> {
+fn lookup<'a, T: Clone>(bindings: &'a Option<Table<T>>, lookup_name: &str) -> Option<&'a T> {
     match bindings {
         Some(bindings) => bindings.lookup(lookup_name),
         None => None,
@@ -67,15 +67,15 @@ impl CaptureTable {
 
 struct Frame {
     stack_top: StackOffset,
-    locals: Option<SymbolTable<StackOffset>>,
+    locals: Option<Table<StackOffset>>,
     captures: CaptureTable,
 }
 
 struct StackState {
     stack_top: StackOffset,
     save_stack: Vec<StackOffset>,
-    globals: SymbolTable<StackOffset>,
-    locals: Option<SymbolTable<StackOffset>>,
+    globals: Table<StackOffset>,
+    locals: Option<Table<StackOffset>>,
     call_stack: Vec<Frame>,
 }
 
@@ -84,13 +84,13 @@ impl StackState {
         Self {
             stack_top: StackOffset(0),
             save_stack: Vec::new(),
-            globals: SymbolTable::new(),
+            globals: Table::new(),
             locals: None,
             call_stack: Vec::new(),
         }
     }
 
-    fn current_bindings(&mut self) -> &mut SymbolTable<StackOffset> {
+    fn current_bindings(&mut self) -> &mut Table<StackOffset> {
         match self.locals.as_mut() {
             Some(locals) => locals,
             None => &mut self.globals,
@@ -115,7 +115,7 @@ impl StackState {
 
     fn begin_scope(&mut self, name: &str) {
         let stack_index = self.stack_top - StackOffset(1);
-        self.current_bindings().push(name, &stack_index);
+        self.current_bindings().push(name.to_string(), stack_index);
     }
 
     fn end_scope(&mut self) {
@@ -124,7 +124,7 @@ impl StackState {
 
     fn begin_proc(&mut self, name: &str, var: &str) {
         let stack_top = std::mem::replace(&mut self.stack_top, StackOffset(0));
-        let locals = std::mem::replace(&mut self.locals, Some(SymbolTable::new()));
+        let locals = std::mem::replace(&mut self.locals, Some(Table::new()));
         let frame = Frame {
             stack_top,
             locals,
