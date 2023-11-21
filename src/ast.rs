@@ -95,24 +95,15 @@ impl Type {
     }
 
     pub fn is_int(&self) -> bool {
-        match self.tag.as_ref() {
-            TypeTag::Int => true,
-            _ => false,
-        }
+        self.tag.is_int()
     }
 
     pub fn is_bool(&self) -> bool {
-        match self.tag.as_ref() {
-            TypeTag::Bool => true,
-            _ => false,
-        }
+        self.tag.is_bool()
     }
 
     pub fn as_proc(&self) -> Option<(&Type, &Type)> {
-        match self.tag.as_ref() {
-            TypeTag::Proc { t_param, t_result } => Some((t_param, t_result)),
-            _ => None,
-        }
+        self.tag.as_proc()
     }
 }
 
@@ -141,22 +132,46 @@ enum TypeTag {
     Proc { t_param: Type, t_result: Type },
 }
 
-impl PartialEq for TypeTag {
-    fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (TypeTag::Int, TypeTag::Int) | (TypeTag::Bool, TypeTag::Bool) => true,
-            (
-                TypeTag::Proc {
-                    t_param: t_param_left,
-                    t_result: t_result_left,
-                },
-                TypeTag::Proc {
-                    t_param: t_param_right,
-                    t_result: t_result_right,
-                },
-            ) => t_param_left == t_param_right && t_result_left == t_result_right,
+impl TypeTag {
+    pub fn is_int(&self) -> bool {
+        match self {
+            TypeTag::Int => true,
             _ => false,
         }
+    }
+
+    pub fn is_bool(&self) -> bool {
+        match self {
+            TypeTag::Bool => true,
+            _ => false,
+        }
+    }
+
+    pub fn as_proc(&self) -> Option<(&Type, &Type)> {
+        match self {
+            TypeTag::Proc { t_param, t_result } => Some((t_param, t_result)),
+            _ => None,
+        }
+    }
+}
+
+impl PartialEq for TypeTag {
+    fn eq(&self, other: &Self) -> bool {
+        if self.is_int() && other.is_int() {
+            return true;
+        }
+
+        if self.is_bool() && other.is_bool() {
+            return true;
+        }
+
+        if let Some(left_proc) = self.as_proc() {
+            if let Some(right_proc) = other.as_proc() {
+                return left_proc == right_proc;
+            }
+        }
+
+        return false;
     }
 }
 
