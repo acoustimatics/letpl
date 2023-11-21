@@ -90,7 +90,7 @@ impl Type {
     }
 
     pub fn new_proc(t_param: Type, t_result: Type) -> Self {
-        let tag = Rc::new(TypeTag::Proc(t_param, t_result));
+        let tag = Rc::new(TypeTag::Proc { t_param, t_result });
         Self { tag }
     }
 
@@ -110,7 +110,7 @@ impl Type {
 
     pub fn as_proc(&self) -> Option<(&Type, &Type)> {
         match self.tag.as_ref() {
-            TypeTag::Proc(t_param, t_body) => Some((t_param, t_body)),
+            TypeTag::Proc { t_param, t_result } => Some((t_param, t_result)),
             _ => None,
         }
     }
@@ -138,7 +138,7 @@ impl fmt::Display for Type {
 enum TypeTag {
     Int,
     Bool,
-    Proc(Type, Type),
+    Proc { t_param: Type, t_result: Type },
 }
 
 impl PartialEq for TypeTag {
@@ -146,8 +146,14 @@ impl PartialEq for TypeTag {
         match (self, other) {
             (TypeTag::Int, TypeTag::Int) | (TypeTag::Bool, TypeTag::Bool) => true,
             (
-                TypeTag::Proc(t_param_left, t_result_left),
-                TypeTag::Proc(t_param_right, t_result_right),
+                TypeTag::Proc {
+                    t_param: t_param_left,
+                    t_result: t_result_left,
+                },
+                TypeTag::Proc {
+                    t_param: t_param_right,
+                    t_result: t_result_right,
+                },
             ) => t_param_left == t_param_right && t_result_left == t_result_right,
             _ => false,
         }
@@ -159,7 +165,7 @@ impl fmt::Display for TypeTag {
         match self {
             TypeTag::Int => write!(f, "int"),
             TypeTag::Bool => write!(f, "bool"),
-            TypeTag::Proc(t_param, t_result) => write!(f, "({t_param} -> {t_result})"),
+            TypeTag::Proc { t_param, t_result } => write!(f, "({t_param} -> {t_result})"),
         }
     }
 }
