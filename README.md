@@ -14,10 +14,12 @@ letpl's grammar is:
                ::= "if" Expression "then" Expression "else" Expression
                ::= Identifier
                ::= "let" Identifier "=" Expression "in" Expression
-               ::= "proc" "(" Identifier ":" Type ")" Expression
+               ::= "proc" "(" Param ")" Expression
                ::= "(" Expression Expression ")"
-               ::= "letrec" Type Identifier "(" Identifier ":" Type ")" Expression "in" Expression
+               ::= "letrec" Type Identifier "(" Param ")" Expression "in" Expression
                ::= "assert" Expression "then" Expression
+
+    Param      ::= Identifier ":" Type
 
     Number     ::= "0" .. "9"
     

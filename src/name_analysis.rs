@@ -190,48 +190,56 @@ fn resolve_names_expr(
     state: &mut CompilerState,
 ) -> Result<Box<nameless::Expr>, String> {
     match expr {
-        ast::Expr::Assert { line, guard, body } => {
-            let guard = resolve_names_expr(guard, state)?;
+        ast::Expr::Assert { line, test, body } => {
+            let test = resolve_names_expr(test, state)?;
             state.pop();
             let body = resolve_names_expr(body, state)?;
             Ok(Box::new(nameless::Expr::Assert {
                 line: *line,
-                guard,
+                test,
                 body,
             }))
         }
 
-        ast::Expr::Call(proc, arg) => {
+        ast::Expr::Call { proc, arg } => {
             let proc = resolve_names_expr(proc, state)?;
             let arg = resolve_names_expr(arg, state)?;
             state.pop();
             state.pop();
             state.push();
-            Ok(Box::new(nameless::Expr::Call(proc, arg)))
+            Ok(Box::new(nameless::Expr::Call { proc, arg }))
         }
 
-        ast::Expr::Const(x) => {
+        ast::Expr::LiteralInt(x) => {
             state.push();
-            Ok(Box::new(nameless::Expr::Const(*x)))
+            Ok(Box::new(nameless::Expr::LiteralInt(*x)))
         }
 
-        ast::Expr::Diff(lhs, rhs) => {
-            let lhs = resolve_names_expr(lhs, state)?;
-            let rhs = resolve_names_expr(rhs, state)?;
+        ast::Expr::Subtract { left, right } => {
+            let left = resolve_names_expr(left, state)?;
+            let right = resolve_names_expr(right, state)?;
             state.pop();
             state.pop();
             state.push();
-            Ok(Box::new(nameless::Expr::Diff(lhs, rhs)))
+            Ok(Box::new(nameless::Expr::Subtract { left, right }))
         }
 
-        ast::Expr::If(guard, consq, alt) => {
-            let guard = resolve_names_expr(guard, state)?;
+        ast::Expr::If {
+            test,
+            consequent,
+            alternate,
+        } => {
+            let test = resolve_names_expr(test, state)?;
             state.pop();
             state.save_stack();
-            let alt = resolve_names_expr(alt, state)?;
+            let alternate = resolve_names_expr(alternate, state)?;
             state.restore_stack();
-            let consq = resolve_names_expr(consq, state)?;
-            Ok(Box::new(nameless::Expr::If(guard, consq, alt)))
+            let consequent = resolve_names_expr(consequent, state)?;
+            Ok(Box::new(nameless::Expr::If {
+                test,
+                consequent,
+                alternate,
+            }))
         }
 
         ast::Expr::IsZero(e) => {
@@ -241,26 +249,26 @@ fn resolve_names_expr(
             Ok(Box::new(nameless::Expr::IsZero(e)))
         }
 
-        ast::Expr::Let(var, rhs, body) => {
-            let rhs = resolve_names_expr(rhs, state)?;
-            state.begin_scope(var);
+        ast::Expr::Let { name, expr, body } => {
+            let expr = resolve_names_expr(expr, state)?;
+            state.begin_scope(name);
             let body = resolve_names_expr(body, state)?;
             state.end_scope();
-            Ok(Box::new(nameless::Expr::Let(rhs, body)))
+            Ok(Box::new(nameless::Expr::Let { expr, body }))
         }
 
         ast::Expr::LetRec {
             name,
-            var,
+            param,
             proc_body,
             let_body,
             ..
         } => {
-            let proc = resolve_names_proc(name, var, proc_body, state)?;
+            let expr = resolve_names_proc(name, &param.name, proc_body, state)?;
             state.begin_scope(name);
-            let let_body = resolve_names_expr(let_body, state)?;
+            let body = resolve_names_expr(let_body, state)?;
             state.end_scope();
-            Ok(Box::new(nameless::Expr::Let(proc, let_body)))
+            Ok(Box::new(nameless::Expr::Let { expr, body }))
         }
 
         ast::Expr::LiteralBool(value) => {
@@ -268,20 +276,20 @@ fn resolve_names_expr(
             Ok(Box::new(nameless::Expr::LiteralBool(*value)))
         }
 
-        ast::Expr::Proc(var, _, body) => resolve_names_proc("", var, body, state),
+        ast::Expr::Proc { param, body } => resolve_names_proc("", &param.name, body, state),
 
-        ast::Expr::Var(var) => {
-            if let Some(&stack_index) = state.lookup_local(var) {
+        ast::Expr::Name(name) => {
+            if let Some(&stack_index) = state.lookup_local(name) {
                 state.push();
                 Ok(Box::new(nameless::Expr::Local(stack_index)))
-            } else if let Some(capture_index) = state.lookup_capture(var) {
+            } else if let Some(capture_index) = state.lookup_capture(name) {
                 state.push();
                 Ok(Box::new(nameless::Expr::Capture(capture_index)))
-            } else if let Some(&stack_index) = state.globals.lookup(var) {
+            } else if let Some(&stack_index) = state.globals.lookup(name) {
                 state.push();
                 Ok(Box::new(nameless::Expr::Global(stack_index)))
             } else {
-                Err(format!("undefined name: {var}"))
+                Err(format!("undefined name: {name}"))
             }
         }
     }
@@ -308,5 +316,5 @@ fn resolve_names_proc(
         })
         .collect();
     state.push();
-    Ok(Box::new(nameless::Expr::Proc(body, captures)))
+    Ok(Box::new(nameless::Expr::Proc { body, captures }))
 }

@@ -13,10 +13,10 @@ use std::error::Error;
 use std::io::Write;
 use std::{env, fs, io};
 
-use ast::LetType;
+use ast::Type;
 use runtime::Value;
 
-type EvalResult = Result<(Value, LetType), Box<dyn Error>>;
+type EvalResult = Result<(Value, Type), Box<dyn Error>>;
 
 fn main() {
     let args: Vec<String> = env::args().collect();

@@ -34,8 +34,8 @@ fn compile_expr(
     chunk: &mut Chunk,
 ) -> Result<(), String> {
     match expr {
-        Expr::Assert { line, guard, body } => {
-            compile_expr(guard, scope, ExprPos::Operand, chunk)?;
+        Expr::Assert { line, test, body } => {
+            compile_expr(test, scope, ExprPos::Operand, chunk)?;
             chunk.emit(Op::Assert { line: *line });
             compile_expr(body, scope, ExprPos::Tail, chunk)?;
         }
@@ -44,7 +44,7 @@ fn compile_expr(
             chunk.emit(Op::PushCapture(*i));
         }
 
-        Expr::Call(proc, arg) => {
+        Expr::Call { proc, arg } => {
             compile_expr(proc, scope, ExprPos::Operand, chunk)?;
             compile_expr(arg, scope, ExprPos::Operand, chunk)?;
             if scope == Scope::Local && expr_pos == ExprPos::Tail {
@@ -54,14 +54,14 @@ fn compile_expr(
             }
         }
 
-        Expr::Const(x) => {
+        Expr::LiteralInt(x) => {
             let v = Value::Integer(*x);
             chunk.emit(Op::PushValue(v));
         }
 
-        Expr::Diff(e1, e2) => {
-            compile_expr(e1, scope, ExprPos::Operand, chunk)?;
-            compile_expr(e2, scope, ExprPos::Operand, chunk)?;
+        Expr::Subtract { left, right } => {
+            compile_expr(left, scope, ExprPos::Operand, chunk)?;
+            compile_expr(right, scope, ExprPos::Operand, chunk)?;
             chunk.emit(Op::Diff);
         }
 
@@ -69,13 +69,17 @@ fn compile_expr(
             chunk.emit(Op::PushGlobal(*i));
         }
 
-        Expr::If(guard, consq, alt) => {
-            compile_expr(guard, scope, ExprPos::Operand, chunk)?;
+        Expr::If {
+            test,
+            consequent,
+            alternate,
+        } => {
+            compile_expr(test, scope, ExprPos::Operand, chunk)?;
             let branch_to_consq = chunk.emit(Op::JumpTrue(0));
-            compile_expr(alt, scope, ExprPos::Tail, chunk)?;
+            compile_expr(alternate, scope, ExprPos::Tail, chunk)?;
             let branch_to_end = chunk.emit(Op::Jump(0));
             let consq_start = chunk.next_address();
-            compile_expr(consq, scope, ExprPos::Tail, chunk)?;
+            compile_expr(consequent, scope, ExprPos::Tail, chunk)?;
             let if_end = chunk.next_address();
             chunk.patch(branch_to_consq, consq_start);
             chunk.patch(branch_to_end, if_end);
@@ -86,8 +90,8 @@ fn compile_expr(
             chunk.emit(Op::IsZero);
         }
 
-        Expr::Let(rhs, body) => {
-            compile_expr(rhs, scope, ExprPos::Operand, chunk)?;
+        Expr::Let { expr, body } => {
+            compile_expr(expr, scope, ExprPos::Operand, chunk)?;
             compile_expr(body, scope, ExprPos::Tail, chunk)?;
         }
 
@@ -99,7 +103,7 @@ fn compile_expr(
             chunk.emit(Op::PushLocal(*i));
         }
 
-        Expr::Proc(body, captures) => {
+        Expr::Proc { body, captures } => {
             let branch_make_proc = chunk.emit(Op::Jump(0));
             let start = chunk.next_address();
             compile_expr(body, Scope::Local, ExprPos::Tail, chunk)?;

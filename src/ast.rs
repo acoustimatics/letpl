@@ -14,121 +14,141 @@ pub enum Expr {
     /// An expression guarded by a test expression.
     Assert {
         line: usize,
-        guard: Box<Expr>,
+        test: Box<Expr>,
         body: Box<Expr>,
     },
 
-    /// A constant numerical expression.
-    Const(i64),
+    /// A procedure call expression.
+    Call { proc: Box<Expr>, arg: Box<Expr> },
 
-    /// An expression that subtracts two sub-expressions.
-    Diff(Box<Expr>, Box<Expr>),
+    /// A conditional expression.
+    If {
+        test: Box<Expr>,
+        consequent: Box<Expr>,
+        alternate: Box<Expr>,
+    },
 
     /// An expression that test if a sub-expression is zero.
     IsZero(Box<Expr>),
 
-    /// A conditional expression.
-    If(Box<Expr>, Box<Expr>, Box<Expr>),
-
-    /// A variable lookup expression.
-    Var(String),
-
     /// An expression with a name bound to a value.
-    Let(String, Box<Expr>, Box<Expr>),
+    Let {
+        name: String,
+        expr: Box<Expr>,
+        body: Box<Expr>,
+    },
+
+    /// A recursive procedure definition expression.
+    LetRec {
+        t_result: Type,
+        name: String,
+        param: Param,
+        proc_body: Box<Expr>,
+        let_body: Box<Expr>,
+    },
 
     /// A literal Boolean expression.
     LiteralBool(bool),
 
+    /// A literal integer expression.
+    LiteralInt(i64),
+
+    /// A name lookup expression.
+    Name(String),
+
     /// A procedure definition expression.
-    Proc(String, LetType, Box<Expr>),
+    Proc { param: Param, body: Box<Expr> },
 
-    /// A procedure call expression.
-    Call(Box<Expr>, Box<Expr>),
-
-    /// A recursive procedure definition expression.
-    LetRec {
-        result_type: LetType,
-        name: String,
-        var: String,
-        var_type: LetType,
-        proc_body: Box<Expr>,
-        let_body: Box<Expr>,
-    },
+    /// An expression that subtracts right from left.
+    Subtract { left: Box<Expr>, right: Box<Expr> },
 }
 
-/// Represents a type in letpl.
-pub struct LetType {
-    let_type: Rc<TypeTag>,
+pub struct Param {
+    pub name: String,
+    pub t: Type,
 }
 
-impl LetType {
+impl Param {
+    pub fn new(name: String, t: Type) -> Param {
+        Param { name, t }
+    }
+}
+
+pub struct Type {
+    tag: Rc<TypeTag>,
+}
+
+impl Type {
     pub fn new_int() -> Self {
-        let let_type = Rc::new(TypeTag::Int);
-        Self { let_type }
+        let tag = Rc::new(TypeTag::Int);
+        Self { tag }
     }
 
     pub fn new_bool() -> Self {
-        let let_type = Rc::new(TypeTag::Bool);
-        Self { let_type }
+        let tag = Rc::new(TypeTag::Bool);
+        Self { tag }
     }
 
-    pub fn new_proc(var_type: LetType, result_type: LetType) -> Self {
-        let let_type = Rc::new(TypeTag::Proc(var_type, result_type));
-        Self { let_type }
+    pub fn new_proc(t_param: Type, t_result: Type) -> Self {
+        let tag = Rc::new(TypeTag::Proc(t_param, t_result));
+        Self { tag }
     }
 
     pub fn is_int(&self) -> bool {
-        match self.let_type.as_ref() {
+        match self.tag.as_ref() {
             TypeTag::Int => true,
             _ => false,
         }
     }
 
     pub fn is_bool(&self) -> bool {
-        match self.let_type.as_ref() {
+        match self.tag.as_ref() {
             TypeTag::Bool => true,
             _ => false,
         }
     }
 
-    pub fn as_proc(&self) -> Option<(&LetType, &LetType)> {
-        match self.let_type.as_ref() {
-            TypeTag::Proc(t_arg, t_body) => Some((t_arg, t_body)),
+    pub fn as_proc(&self) -> Option<(&Type, &Type)> {
+        match self.tag.as_ref() {
+            TypeTag::Proc(t_param, t_body) => Some((t_param, t_body)),
             _ => None,
         }
     }
 }
 
-impl PartialEq for LetType {
+impl PartialEq for Type {
     fn eq(&self, other: &Self) -> bool {
-        self.let_type.as_ref() == other.let_type.as_ref()
+        self.tag.as_ref() == other.tag.as_ref()
     }
 }
 
-impl Clone for LetType {
+impl Clone for Type {
     fn clone(&self) -> Self {
-        let let_type = Rc::clone(&self.let_type);
-        Self { let_type }
+        let tag = Rc::clone(&self.tag);
+        Self { tag }
     }
 }
 
-impl fmt::Display for LetType {
+impl fmt::Display for Type {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.let_type)
+        write!(f, "{}", self.tag)
     }
 }
 
 enum TypeTag {
     Int,
     Bool,
-    Proc(LetType, LetType),
+    Proc(Type, Type),
 }
 
 impl PartialEq for TypeTag {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
             (TypeTag::Int, TypeTag::Int) | (TypeTag::Bool, TypeTag::Bool) => true,
-            (TypeTag::Proc(v1, r1), TypeTag::Proc(v2, r2)) => v1 == v2 && r1 == r2,
+            (
+                TypeTag::Proc(t_param_left, t_result_left),
+                TypeTag::Proc(t_param_right, t_result_right),
+            ) => t_param_left == t_param_right && t_result_left == t_result_right,
             _ => false,
         }
     }
@@ -139,7 +159,7 @@ impl fmt::Display for TypeTag {
         match self {
             TypeTag::Int => write!(f, "int"),
             TypeTag::Bool => write!(f, "bool"),
-            TypeTag::Proc(var, result) => write!(f, "({var} -> {result})"),
+            TypeTag::Proc(t_param, t_result) => write!(f, "({t_param} -> {t_result})"),
         }
     }
 }
@@ -155,31 +175,51 @@ pub mod nameless {
         /// An expression which guards its body expression by a test expression.
         Assert {
             line: usize,
-            guard: Box<Expr>,
+            test: Box<Expr>,
             body: Box<Expr>,
         },
 
-        Call(Box<Expr>, Box<Expr>),
+        /// A procedure call expression.
+        Call {
+            proc: Box<Expr>,
+            arg: Box<Expr>,
+        },
 
         Capture(usize),
 
-        Const(i64),
-
-        Diff(Box<Expr>, Box<Expr>),
-
         Global(usize),
+
+        /// A conditional expression.
+        If {
+            test: Box<Expr>,
+            consequent: Box<Expr>,
+            alternate: Box<Expr>,
+        },
 
         IsZero(Box<Expr>),
 
-        If(Box<Expr>, Box<Expr>, Box<Expr>),
-
-        Let(Box<Expr>, Box<Expr>),
+        Let {
+            expr: Box<Expr>,
+            body: Box<Expr>,
+        },
 
         LiteralBool(bool),
 
+        /// A literal integer expression.
+        LiteralInt(i64),
+
         Local(usize),
 
-        Proc(Box<Expr>, Vec<Capture>),
+        Proc {
+            body: Box<Expr>,
+            captures: Vec<Capture>,
+        },
+
+        /// An expression that subtracts right from left.
+        Subtract {
+            left: Box<Expr>,
+            right: Box<Expr>,
+        },
     }
 
     pub enum Capture {

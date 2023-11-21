@@ -1,6 +1,6 @@
 //! A recursive decent letpl parser.
 
-use crate::ast::{Expr, LetType, Program};
+use crate::ast::{Expr, Param, Program, Type};
 use crate::scanner::{Scanner, Token, TokenTag};
 
 type ExprResult = Result<Box<Expr>, String>;
@@ -60,7 +60,7 @@ impl<'a> Parser<'a> {
             TokenTag::Number(x) => {
                 let x = *x;
                 self.advance()?;
-                Ok(Box::new(Expr::Const(x)))
+                Ok(Box::new(Expr::LiteralInt(x)))
             }
             TokenTag::True => {
                 self.advance()?;
@@ -74,10 +74,10 @@ impl<'a> Parser<'a> {
             TokenTag::IsZero => self.is_zero(),
             TokenTag::Assert => self.assert(),
             TokenTag::If => self.if_expr(),
-            TokenTag::Identifier(var) => {
-                let var = var.clone();
+            TokenTag::Identifier(name) => {
+                let name = name.clone();
                 self.advance()?;
-                Ok(Box::new(Expr::Var(var)))
+                Ok(Box::new(Expr::Name(name)))
             }
             TokenTag::Let => self.let_expr(),
             TokenTag::LetRec => self.let_rec_expr(),
@@ -90,12 +90,12 @@ impl<'a> Parser<'a> {
     fn diff(&mut self) -> ExprResult {
         self.advance()?;
         self.expect(TokenTag::LeftParen)?;
-        let left_expr = self.expr()?;
+        let left = self.expr()?;
         self.expect(TokenTag::Comma)?;
-        let right_expr = self.expr()?;
+        let right = self.expr()?;
         self.expect(TokenTag::RightParen)?;
 
-        Ok(Box::new(Expr::Diff(left_expr, right_expr)))
+        Ok(Box::new(Expr::Subtract { left, right }))
     }
 
     fn is_zero(&mut self) -> ExprResult {
@@ -110,53 +110,54 @@ impl<'a> Parser<'a> {
     fn assert(&mut self) -> ExprResult {
         let line = self.current.line;
         self.advance()?;
-        let guard = self.expr()?;
+        let test = self.expr()?;
         self.expect(TokenTag::Then)?;
         let body = self.expr()?;
 
-        Ok(Box::new(Expr::Assert { line, guard, body }))
+        Ok(Box::new(Expr::Assert { line, test, body }))
     }
 
     fn if_expr(&mut self) -> ExprResult {
         self.advance()?;
-        let condition = self.expr()?;
+        let test = self.expr()?;
         self.expect(TokenTag::Then)?;
-        let consequence = self.expr()?;
+        let consequent = self.expr()?;
         self.expect(TokenTag::Else)?;
-        let alternative = self.expr()?;
+        let alternate = self.expr()?;
 
-        Ok(Box::new(Expr::If(condition, consequence, alternative)))
+        Ok(Box::new(Expr::If {
+            test,
+            consequent,
+            alternate,
+        }))
     }
 
     fn let_expr(&mut self) -> ExprResult {
         self.advance()?;
-        let var = self.expect_identifer()?;
+        let name = self.expect_identifer()?;
         self.expect(TokenTag::Equal)?;
         let expr = self.expr()?;
         self.expect(TokenTag::In)?;
         let body = self.expr()?;
 
-        Ok(Box::new(Expr::Let(var, expr, body)))
+        Ok(Box::new(Expr::Let { name, expr, body }))
     }
 
     fn let_rec_expr(&mut self) -> ExprResult {
         self.advance()?;
-        let result_type = self.parse_type()?;
+        let t_result = self.parse_type()?;
         let name = self.expect_identifer()?;
         self.expect(TokenTag::LeftParen)?;
-        let var = self.expect_identifer()?;
-        self.expect(TokenTag::Colon)?;
-        let var_type = self.parse_type()?;
+        let param = self.param()?;
         self.expect(TokenTag::RightParen)?;
         let proc_body = self.expr()?;
         self.expect(TokenTag::In)?;
         let let_body = self.expr()?;
 
         Ok(Box::new(Expr::LetRec {
-            result_type,
+            t_result,
             name,
-            var,
-            var_type,
+            param,
             proc_body,
             let_body,
         }))
@@ -165,33 +166,38 @@ impl<'a> Parser<'a> {
     fn proc_expr(&mut self) -> ExprResult {
         self.advance()?;
         self.expect(TokenTag::LeftParen)?;
-        let var = self.expect_identifer()?;
-        self.expect(TokenTag::Colon)?;
-        let ty = self.parse_type()?;
+        let param = self.param()?;
         self.expect(TokenTag::RightParen)?;
         let body = self.expr()?;
 
-        Ok(Box::new(Expr::Proc(var, ty, body)))
+        Ok(Box::new(Expr::Proc { param, body }))
     }
 
     fn call_expr(&mut self) -> ExprResult {
         self.advance()?;
-        let operator = self.expr()?;
-        let operand = self.expr()?;
+        let proc = self.expr()?;
+        let arg = self.expr()?;
         self.expect(TokenTag::RightParen)?;
 
-        Ok(Box::new(Expr::Call(operator, operand)))
+        Ok(Box::new(Expr::Call { proc, arg }))
     }
 
-    fn parse_type(&mut self) -> Result<LetType, String> {
+    fn param(&mut self) -> Result<Param, String> {
+        let name = self.expect_identifer()?;
+        self.expect(TokenTag::Colon)?;
+        let t = self.parse_type()?;
+        Ok(Param::new(name, t))
+    }
+
+    fn parse_type(&mut self) -> Result<Type, String> {
         match self.current.tag {
             TokenTag::Int => {
                 self.advance()?;
-                Ok(LetType::new_int())
+                Ok(Type::new_int())
             }
             TokenTag::Bool => {
                 self.advance()?;
-                Ok(LetType::new_bool())
+                Ok(Type::new_bool())
             }
             TokenTag::LeftParen => {
                 self.advance()?;
@@ -199,7 +205,7 @@ impl<'a> Parser<'a> {
                 self.expect(TokenTag::Arrow)?;
                 let result_type = self.parse_type()?;
                 self.expect(TokenTag::RightParen)?;
-                Ok(LetType::new_proc(var_type, result_type))
+                Ok(Type::new_proc(var_type, result_type))
             }
             _ => Err(format!("unexpected token `{}`", self.current.tag)),
         }
