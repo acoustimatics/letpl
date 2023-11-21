@@ -2,7 +2,7 @@
 
 use std::fmt;
 
-use crate::ast::nameless::{self, Expr, Program};
+use crate::ast::nameless::{self, Expr, Program, StackOffset};
 use crate::runtime::{self, Op, Value};
 
 #[derive(Copy, Clone, PartialEq)]
@@ -65,8 +65,8 @@ fn compile_expr(
             chunk.emit(Op::Diff);
         }
 
-        Expr::Global(i) => {
-            chunk.emit(Op::PushGlobal(*i));
+        Expr::Global(StackOffset(offset)) => {
+            chunk.emit(Op::PushGlobal(*offset));
         }
 
         Expr::If {
@@ -99,8 +99,8 @@ fn compile_expr(
             chunk.emit(Op::PushValue(Value::Boolean(*value)));
         }
 
-        Expr::Local(i) => {
-            chunk.emit(Op::PushLocal(*i));
+        Expr::Local(StackOffset(offset)) => {
+            chunk.emit(Op::PushLocal(*offset));
         }
 
         Expr::Proc { body, captures } => {

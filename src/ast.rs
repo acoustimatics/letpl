@@ -188,6 +188,8 @@ impl fmt::Display for TypeTag {
 pub mod nameless {
     //! A namless version of the AST, that is, an AST without identifiers.
 
+    use std::ops;
+
     pub struct Program {
         pub expr: Box<Expr>,
     }
@@ -208,7 +210,7 @@ pub mod nameless {
 
         Capture(usize),
 
-        Global(usize),
+        Global(StackOffset),
 
         /// A conditional expression.
         If {
@@ -229,7 +231,7 @@ pub mod nameless {
         /// A literal integer expression.
         LiteralInt(i64),
 
-        Local(usize),
+        Local(StackOffset),
 
         Proc {
             body: Box<Expr>,
@@ -241,6 +243,28 @@ pub mod nameless {
             left: Box<Expr>,
             right: Box<Expr>,
         },
+    }
+
+    #[derive(Clone, Copy)]
+    pub struct StackOffset(pub usize);
+
+    impl ops::AddAssign for StackOffset {
+        fn add_assign(&mut self, other: Self) {
+            self.0 += other.0;
+        }
+    }
+
+    impl ops::Sub for StackOffset {
+        type Output = Self;
+        fn sub(self, other: Self) -> Self {
+            StackOffset(self.0 - other.0)
+        }
+    }
+
+    impl ops::SubAssign for StackOffset {
+        fn sub_assign(&mut self, other: Self) {
+            self.0 -= other.0;
+        }
     }
 
     pub enum Capture {

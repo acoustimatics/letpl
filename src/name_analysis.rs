@@ -1,10 +1,10 @@
 //! Analysis of how identifier names are used in an letpl program.
 
 use crate::ast;
-use crate::ast::nameless;
+use crate::ast::nameless::{self, StackOffset};
 use crate::symbol_table::SymbolTable;
 
-fn lookup<'a>(bindings: &'a Option<SymbolTable<usize>>, lookup_name: &str) -> Option<&'a usize> {
+fn lookup<'a, T: Clone>(bindings: &'a Option<SymbolTable<T>>, lookup_name: &str) -> Option<&'a T> {
     match bindings {
         Some(bindings) => bindings.lookup(lookup_name),
         None => None,
@@ -29,10 +29,10 @@ impl CaptureTable {
         }
     }
 
-    fn add_local_capture(&mut self, name: &str, scope: usize) -> usize {
+    fn add_local_capture(&mut self, name: &str, stack_offset: StackOffset) -> usize {
         let name = name.to_owned();
         let is_local = true;
-        let index = scope;
+        let StackOffset(index) = stack_offset;
         let capture = Capture {
             name,
             is_local,
@@ -66,23 +66,23 @@ impl CaptureTable {
 }
 
 struct Frame {
-    stack_top: usize,
-    locals: Option<SymbolTable<usize>>,
+    stack_top: StackOffset,
+    locals: Option<SymbolTable<StackOffset>>,
     captures: CaptureTable,
 }
 
-struct CompilerState {
-    stack_top: usize,
-    save_stack: Vec<usize>,
-    globals: SymbolTable<usize>,
-    locals: Option<SymbolTable<usize>>,
+struct StackState {
+    stack_top: StackOffset,
+    save_stack: Vec<StackOffset>,
+    globals: SymbolTable<StackOffset>,
+    locals: Option<SymbolTable<StackOffset>>,
     call_stack: Vec<Frame>,
 }
 
-impl CompilerState {
+impl StackState {
     fn new() -> Self {
         Self {
-            stack_top: 0,
+            stack_top: StackOffset(0),
             save_stack: Vec::new(),
             globals: SymbolTable::new(),
             locals: None,
@@ -90,7 +90,7 @@ impl CompilerState {
         }
     }
 
-    fn current_bindings(&mut self) -> &mut SymbolTable<usize> {
+    fn current_bindings(&mut self) -> &mut SymbolTable<StackOffset> {
         match self.locals.as_mut() {
             Some(locals) => locals,
             None => &mut self.globals,
@@ -98,11 +98,11 @@ impl CompilerState {
     }
 
     fn push(&mut self) {
-        self.stack_top += 1;
+        self.stack_top += StackOffset(1);
     }
 
     fn pop(&mut self) {
-        self.stack_top -= 1;
+        self.stack_top -= StackOffset(1);
     }
 
     fn save_stack(&mut self) {
@@ -114,7 +114,7 @@ impl CompilerState {
     }
 
     fn begin_scope(&mut self, name: &str) {
-        let stack_index = self.stack_top - 1;
+        let stack_index = self.stack_top - StackOffset(1);
         self.current_bindings().push(name, &stack_index);
     }
 
@@ -123,7 +123,7 @@ impl CompilerState {
     }
 
     fn begin_proc(&mut self, name: &str, var: &str) {
-        let stack_top = std::mem::replace(&mut self.stack_top, 0);
+        let stack_top = std::mem::replace(&mut self.stack_top, StackOffset(0));
         let locals = std::mem::replace(&mut self.locals, Some(SymbolTable::new()));
         let frame = Frame {
             stack_top,
@@ -146,7 +146,7 @@ impl CompilerState {
         frame.captures
     }
 
-    fn lookup_local(&mut self, lookup_name: &str) -> Option<&usize> {
+    fn lookup_local(&mut self, lookup_name: &str) -> Option<&StackOffset> {
         lookup(&self.locals, lookup_name)
     }
 
@@ -180,14 +180,14 @@ impl CompilerState {
 }
 
 pub fn resolve_names(program: &ast::Program) -> Result<nameless::Program, String> {
-    let mut state = CompilerState::new();
+    let mut state = StackState::new();
     let expr = resolve_names_expr(&program.expr, &mut state)?;
     Ok(nameless::Program { expr })
 }
 
 fn resolve_names_expr(
     expr: &ast::Expr,
-    state: &mut CompilerState,
+    state: &mut StackState,
 ) -> Result<Box<nameless::Expr>, String> {
     match expr {
         ast::Expr::Assert { line, test, body } => {
@@ -279,15 +279,15 @@ fn resolve_names_expr(
         ast::Expr::Proc { param, body } => resolve_names_proc("", &param.name, body, state),
 
         ast::Expr::Name(name) => {
-            if let Some(&stack_index) = state.lookup_local(name) {
+            if let Some(&stack_offset) = state.lookup_local(name) {
                 state.push();
-                Ok(Box::new(nameless::Expr::Local(stack_index)))
+                Ok(Box::new(nameless::Expr::Local(stack_offset)))
             } else if let Some(capture_index) = state.lookup_capture(name) {
                 state.push();
                 Ok(Box::new(nameless::Expr::Capture(capture_index)))
-            } else if let Some(&stack_index) = state.globals.lookup(name) {
+            } else if let Some(&stack_offset) = state.globals.lookup(name) {
                 state.push();
-                Ok(Box::new(nameless::Expr::Global(stack_index)))
+                Ok(Box::new(nameless::Expr::Global(stack_offset)))
             } else {
                 Err(format!("undefined name: {name}"))
             }
@@ -299,7 +299,7 @@ fn resolve_names_proc(
     name: &str,
     var: &str,
     body: &ast::Expr,
-    state: &mut CompilerState,
+    state: &mut StackState,
 ) -> Result<Box<nameless::Expr>, String> {
     state.begin_proc(name, var);
     let body = resolve_names_expr(body, state)?;
