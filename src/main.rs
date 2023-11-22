@@ -62,7 +62,7 @@ fn read() -> Result<String, Box<dyn Error>> {
 
 fn eval(src: &str) -> EvalResult {
     let program = parser::parse(src)?;
-    let program_type = type_checking::let_type_of(&program)?;
+    let program_type = type_checking::type_of_program(&program)?;
     let nameless_program = name_analysis::resolve_names(&program)?;
     let compiled_program = compiler::compile(&nameless_program)?;
     let value = runtime::run(&compiled_program)?;
