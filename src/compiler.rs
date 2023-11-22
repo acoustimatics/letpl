@@ -2,7 +2,7 @@
 
 use std::fmt;
 
-use crate::ast::nameless::{self, Expr, Program, StackOffset};
+use crate::ast::nameless::{self, CaptureOffset, Expr, Program, StackOffset};
 use crate::runtime::{self, Op, Value};
 
 #[derive(Copy, Clone, PartialEq)]
@@ -40,7 +40,7 @@ fn compile_expr(
             compile_expr(body, scope, ExprPos::Tail, chunk)?;
         }
 
-        Expr::Capture(i) => {
+        Expr::Capture(CaptureOffset(i)) => {
             chunk.emit(Op::PushCapture(*i));
         }
 
@@ -111,8 +111,8 @@ fn compile_expr(
             let captures: Vec<runtime::Capture> = captures
                 .iter()
                 .map(|c| match c {
-                    nameless::Capture::Local(i) => runtime::Capture::Local(*i),
-                    nameless::Capture::Capture(i) => runtime::Capture::Capture(*i),
+                    nameless::Capture::Local(StackOffset(i)) => runtime::Capture::Local(*i),
+                    nameless::Capture::Capture(CaptureOffset(i)) => runtime::Capture::Capture(*i),
                 })
                 .collect();
             let make_proc_index = chunk.emit(Op::MakeProc(start, captures));

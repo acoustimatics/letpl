@@ -1,24 +1,28 @@
 //! A table of names and associated values.
 
-struct Item<T> {
-    name: String,
-    value: T,
+pub struct Item<T> {
+    pub name: String,
+    pub value: T,
 }
 
-impl<T: Clone> Item<T> {
+impl<T> Item<T> {
     fn new(name: String, value: T) -> Self {
         Self { name, value }
     }
 }
 
 pub struct Table<T> {
-    items: Vec<Item<T>>,
+    pub items: Vec<Item<T>>,
 }
 
-impl<T: Clone> Table<T> {
+impl<T> Table<T> {
     pub fn new() -> Self {
         let symbols = Vec::new();
         Self { items: symbols }
+    }
+
+    pub fn len(&self) -> usize {
+        self.items.len()
     }
 
     pub fn push(&mut self, name: String, value: T) {
@@ -34,7 +38,16 @@ impl<T: Clone> Table<T> {
         self.items
             .iter()
             .rev()
-            .find(|s| s.name == name)
-            .map(|s| &s.value)
+            .find(|item| item.name == name)
+            .map(|item| &item.value)
+    }
+
+    pub fn lookup_offset(&self, name: &str) -> Option<usize> {
+        self.items
+            .iter()
+            .enumerate()
+            .rev()
+            .find(|(_, item)| item.name == name)
+            .map(|(offset, _)| offset)
     }
 }

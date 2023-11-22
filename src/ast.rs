@@ -208,7 +208,7 @@ pub mod nameless {
             arg: Box<Expr>,
         },
 
-        Capture(usize),
+        Capture(CaptureOffset),
 
         Global(StackOffset),
 
@@ -267,8 +267,12 @@ pub mod nameless {
         }
     }
 
+    #[derive(Clone, Copy)]
+    pub struct CaptureOffset(pub usize);
+
+    #[derive(Clone, Copy)]
     pub enum Capture {
-        Local(usize),
-        Capture(usize),
+        Local(StackOffset),
+        Capture(CaptureOffset),
     }
 }

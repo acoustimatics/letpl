@@ -1,7 +1,7 @@
 //! Analysis of how identifier names are used in an letpl program.
 
 use crate::ast;
-use crate::ast::nameless::{self, StackOffset};
+use crate::ast::nameless::{self, CaptureOffset, StackOffset};
 use crate::table::Table;
 
 fn lookup<'a, T: Clone>(bindings: &'a Option<Table<T>>, lookup_name: &str) -> Option<&'a T> {
@@ -11,57 +11,38 @@ fn lookup<'a, T: Clone>(bindings: &'a Option<Table<T>>, lookup_name: &str) -> Op
     }
 }
 
-#[derive(Debug)]
-struct Capture {
-    name: String,
-    is_local: bool,
-    index: usize,
-}
-
-struct CaptureTable {
-    captures: Vec<Capture>,
-}
+struct CaptureTable(Table<nameless::Capture>);
 
 impl CaptureTable {
     fn new() -> Self {
-        Self {
-            captures: Vec::new(),
-        }
+        CaptureTable(Table::new())
     }
 
-    fn add_local_capture(&mut self, name: &str, stack_offset: StackOffset) -> usize {
-        let name = name.to_owned();
-        let is_local = true;
-        let StackOffset(index) = stack_offset;
-        let capture = Capture {
-            name,
-            is_local,
-            index,
-        };
-        self.captures.push(capture);
-        self.captures.len() - 1
+    fn add_local_capture(&mut self, name: String, stack_offset: StackOffset) -> CaptureOffset {
+        let capture = nameless::Capture::Local(stack_offset);
+        self.push(name, capture)
     }
 
-    fn add_capture_capture(&mut self, name: &str, outer_index: usize) -> usize {
-        let name = name.to_owned();
-        let is_local = false;
-        let index = outer_index;
-        let capture = Capture {
-            name,
-            is_local,
-            index,
-        };
-        self.captures.push(capture);
-        self.captures.len() - 1
+    fn add_capture_capture(
+        &mut self,
+        name: String,
+        outer_capture_offset: CaptureOffset,
+    ) -> CaptureOffset {
+        let capture = nameless::Capture::Capture(outer_capture_offset);
+        self.push(name, capture)
     }
 
-    pub fn lookup(&self, lookup_name: &str) -> Option<usize> {
-        self.captures
-            .iter()
-            .enumerate()
-            .rev()
-            .find(|(_, c)| c.name == lookup_name)
-            .map(|(i, _)| i)
+    pub fn lookup(&self, lookup_name: &str) -> Option<CaptureOffset> {
+        let CaptureTable(table) = self;
+        table
+            .lookup_offset(lookup_name)
+            .map(|offset| CaptureOffset(offset))
+    }
+
+    pub fn push(&mut self, name: String, capture: nameless::Capture) -> CaptureOffset {
+        let CaptureTable(table) = self;
+        table.push(name, capture);
+        CaptureOffset(table.len() - 1)
     }
 }
 
@@ -150,7 +131,7 @@ impl StackState {
         lookup(&self.locals, lookup_name)
     }
 
-    fn lookup_capture(&mut self, lookup_name: &str) -> Option<usize> {
+    fn lookup_capture(&mut self, lookup_name: &str) -> Option<CaptureOffset> {
         let call_depth = self.call_stack.len();
         if call_depth > 0 {
             self.capture(lookup_name, call_depth - 1)
@@ -159,11 +140,13 @@ impl StackState {
         }
     }
 
-    fn capture(&mut self, lookup_name: &str, call_depth: usize) -> Option<usize> {
+    fn capture(&mut self, lookup_name: &str, call_depth: usize) -> Option<CaptureOffset> {
         let frame = &mut self.call_stack[call_depth];
-        if let Some(stack_index) = lookup(&frame.locals, lookup_name) {
-            let capture_index = frame.captures.add_local_capture(lookup_name, *stack_index);
-            Some(capture_index)
+        if let Some(stack_offset) = lookup(&frame.locals, lookup_name) {
+            let capture_offset = frame
+                .captures
+                .add_local_capture(lookup_name.to_string(), *stack_offset);
+            Some(capture_offset)
         } else if let Some(capture_index) = frame.captures.lookup(lookup_name) {
             Some(capture_index)
         } else if call_depth > 0 {
@@ -171,7 +154,7 @@ impl StackState {
                 .map(|outer_capture_index| {
                     self.call_stack[call_depth]
                         .captures
-                        .add_capture_capture(lookup_name, outer_capture_index)
+                        .add_capture_capture(lookup_name.to_string(), outer_capture_index)
                 })
         } else {
             None
@@ -279,14 +262,12 @@ fn resolve_names_expr(
         ast::Expr::Proc { param, body } => resolve_names_proc("", &param.name, body, state),
 
         ast::Expr::Name(name) => {
+            state.push();
             if let Some(&stack_offset) = state.lookup_local(name) {
-                state.push();
                 Ok(Box::new(nameless::Expr::Local(stack_offset)))
-            } else if let Some(capture_index) = state.lookup_capture(name) {
-                state.push();
-                Ok(Box::new(nameless::Expr::Capture(capture_index)))
+            } else if let Some(capture_offset) = state.lookup_capture(name) {
+                Ok(Box::new(nameless::Expr::Capture(capture_offset)))
             } else if let Some(&stack_offset) = state.globals.lookup(name) {
-                state.push();
                 Ok(Box::new(nameless::Expr::Global(stack_offset)))
             } else {
                 Err(format!("undefined name: {name}"))
@@ -303,18 +284,8 @@ fn resolve_names_proc(
 ) -> Result<Box<nameless::Expr>, String> {
     state.begin_proc(name, var);
     let body = resolve_names_expr(body, state)?;
-    let captures = state.end_proc();
-    let captures: Vec<nameless::Capture> = captures
-        .captures
-        .iter()
-        .map(|c| {
-            if c.is_local {
-                nameless::Capture::Local(c.index)
-            } else {
-                nameless::Capture::Capture(c.index)
-            }
-        })
-        .collect();
+    let CaptureTable(table) = state.end_proc();
+    let captures: Vec<nameless::Capture> = table.items.iter().map(|item| item.value).collect();
     state.push();
     Ok(Box::new(nameless::Expr::Proc { body, captures }))
 }
