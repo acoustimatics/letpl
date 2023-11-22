@@ -52,9 +52,20 @@ in
 let sum = ((add 75) 25) in
 assert ((eq? 100) sum) then
 
+let add4 = proc (x1: int) proc (x2: int) proc (x3: int) proc (x4: int)
+    let sum1 = ((add x1) x2) in
+    let sum2 = ((add sum1) x3) in
+    ((add sum2) x4)
+in
+let sum = ((((add4 1) 10) 100) 1000) in
+assert ((eq? 1111) sum) then
+
 # You can partially apply a chained of procedures to get new
 # procedures.
 let add_seventy_five = (add 75) in
+assert ((eq? 100) (add_seventy_five 25)) then
+
+let add_seventy_five = (((add4 15) 40) 20) in
 assert ((eq? 100) (add_seventy_five 25)) then
 
 # `letrec` is for recursive procedures. Here is the requisite fib.
