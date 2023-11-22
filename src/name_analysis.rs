@@ -4,9 +4,9 @@ use crate::ast;
 use crate::ast::nameless::{self, CaptureOffset, StackOffset};
 use crate::table::Table;
 
-fn lookup<'a, T: Clone>(bindings: &'a Option<Table<T>>, lookup_name: &str) -> Option<&'a T> {
+fn lookup<'a, T: Clone>(bindings: &'a Option<Table<T>>, name: &str) -> Option<&'a T> {
     match bindings {
-        Some(bindings) => bindings.lookup(lookup_name),
+        Some(bindings) => bindings.lookup(name),
         None => None,
     }
 }
@@ -32,10 +32,10 @@ impl CaptureTable {
         self.push(name, capture)
     }
 
-    pub fn lookup(&self, lookup_name: &str) -> Option<CaptureOffset> {
+    pub fn lookup(&self, name: &str) -> Option<CaptureOffset> {
         let CaptureTable(table) = self;
         table
-            .lookup_offset(lookup_name)
+            .lookup_offset(name)
             .map(|offset| CaptureOffset(offset))
     }
 
@@ -95,15 +95,15 @@ impl StackState {
     }
 
     fn begin_scope(&mut self, name: &str) {
-        let stack_index = self.stack_top - StackOffset(1);
-        self.current_bindings().push(name.to_string(), stack_index);
+        let stack_offset = self.stack_top - StackOffset(1);
+        self.current_bindings().push(name.to_string(), stack_offset);
     }
 
     fn end_scope(&mut self) {
         self.current_bindings().pop();
     }
 
-    fn begin_proc(&mut self, name: &str, var: &str) {
+    fn begin_proc(&mut self, proc_name: &str, param_name: &str) {
         let stack_top = std::mem::replace(&mut self.stack_top, StackOffset(0));
         let locals = std::mem::replace(&mut self.locals, Some(Table::new()));
         let frame = Frame {
@@ -115,9 +115,9 @@ impl StackState {
 
         // simulate pushing proc object and argument
         self.push();
-        self.begin_scope(name);
+        self.begin_scope(proc_name);
         self.push();
-        self.begin_scope(var);
+        self.begin_scope(param_name);
     }
 
     fn end_proc(&mut self) -> CaptureTable {
@@ -127,34 +127,34 @@ impl StackState {
         frame.captures
     }
 
-    fn lookup_local(&mut self, lookup_name: &str) -> Option<&StackOffset> {
-        lookup(&self.locals, lookup_name)
+    fn lookup_local(&mut self, name: &str) -> Option<&StackOffset> {
+        lookup(&self.locals, name)
     }
 
-    fn lookup_capture(&mut self, lookup_name: &str) -> Option<CaptureOffset> {
+    fn lookup_capture(&mut self, name: &str) -> Option<CaptureOffset> {
         let call_depth = self.call_stack.len();
         if call_depth > 0 {
-            self.capture(lookup_name, call_depth - 1)
+            self.capture(name, call_depth - 1)
         } else {
             None
         }
     }
 
-    fn capture(&mut self, lookup_name: &str, call_depth: usize) -> Option<CaptureOffset> {
+    fn capture(&mut self, name: &str, call_depth: usize) -> Option<CaptureOffset> {
         let frame = &mut self.call_stack[call_depth];
-        if let Some(stack_offset) = lookup(&frame.locals, lookup_name) {
+        if let Some(stack_offset) = lookup(&frame.locals, name) {
             let capture_offset = frame
                 .captures
-                .add_local_capture(lookup_name.to_string(), *stack_offset);
+                .add_local_capture(name.to_string(), *stack_offset);
             Some(capture_offset)
-        } else if let Some(capture_index) = frame.captures.lookup(lookup_name) {
-            Some(capture_index)
+        } else if let Some(capture_offset) = frame.captures.lookup(name) {
+            Some(capture_offset)
         } else if call_depth > 0 {
-            self.capture(lookup_name, call_depth - 1)
-                .map(|outer_capture_index| {
+            self.capture(name, call_depth - 1)
+                .map(|outer_capture_offset| {
                     self.call_stack[call_depth]
                         .captures
-                        .add_capture_capture(lookup_name.to_string(), outer_capture_index)
+                        .add_capture_capture(name.to_string(), outer_capture_offset)
                 })
         } else {
             None
@@ -277,15 +277,16 @@ fn resolve_names_expr(
 }
 
 fn resolve_names_proc(
-    name: &str,
-    var: &str,
+    proc_name: &str,
+    param_name: &str,
     body: &ast::Expr,
     state: &mut StackState,
 ) -> Result<Box<nameless::Expr>, String> {
-    state.begin_proc(name, var);
+    state.begin_proc(proc_name, param_name);
     let body = resolve_names_expr(body, state)?;
-    let CaptureTable(table) = state.end_proc();
-    let captures: Vec<nameless::Capture> = table.items.iter().map(|item| item.value).collect();
+    let CaptureTable(capture_table) = state.end_proc();
+    let captures: Vec<nameless::Capture> =
+        capture_table.items.iter().map(|item| item.value).collect();
     state.push();
     Ok(Box::new(nameless::Expr::Proc { body, captures }))
 }
