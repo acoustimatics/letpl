@@ -187,8 +187,7 @@ impl fmt::Display for TypeTag {
 
 pub mod nameless {
     //! A namless version of the AST, that is, an AST without identifiers.
-
-    use std::ops;
+    use crate::offset::{CaptureOffset, StackOffset};
 
     pub struct Program {
         pub expr: Box<Expr>,
@@ -244,31 +243,6 @@ pub mod nameless {
             right: Box<Expr>,
         },
     }
-
-    #[derive(Clone, Copy)]
-    pub struct StackOffset(pub usize);
-
-    impl ops::AddAssign for StackOffset {
-        fn add_assign(&mut self, other: Self) {
-            self.0 += other.0;
-        }
-    }
-
-    impl ops::Sub for StackOffset {
-        type Output = Self;
-        fn sub(self, other: Self) -> Self {
-            StackOffset(self.0 - other.0)
-        }
-    }
-
-    impl ops::SubAssign for StackOffset {
-        fn sub_assign(&mut self, other: Self) {
-            self.0 -= other.0;
-        }
-    }
-
-    #[derive(Clone, Copy)]
-    pub struct CaptureOffset(pub usize);
 
     #[derive(Clone, Copy)]
     pub enum Capture {

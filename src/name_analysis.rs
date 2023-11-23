@@ -1,7 +1,8 @@
 //! Analysis of how identifier names are used in an letpl program.
 
 use crate::ast;
-use crate::ast::nameless::{self, CaptureOffset, StackOffset};
+use crate::ast::nameless;
+use crate::offset::{CaptureOffset, StackOffset};
 use crate::table::Table;
 
 fn lookup<'a, T: Clone>(bindings: &'a Option<Table<T>>, name: &str) -> Option<&'a T> {

@@ -3,6 +3,7 @@
 mod ast;
 mod compiler;
 mod name_analysis;
+mod offset;
 mod parser;
 mod runtime;
 mod scanner;

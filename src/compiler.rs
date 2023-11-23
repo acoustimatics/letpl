@@ -2,7 +2,8 @@
 
 use std::fmt;
 
-use crate::ast::nameless::{self, CaptureOffset, Expr, Program, StackOffset};
+use crate::ast::nameless::{self, Expr, Program};
+use crate::offset::{CaptureOffset, StackOffset};
 use crate::runtime::{self, Op, Value};
 
 #[derive(Copy, Clone, PartialEq)]
