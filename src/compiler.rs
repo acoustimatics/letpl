@@ -41,8 +41,8 @@ fn compile_expr(
             compile_expr(body, scope, ExprPos::Tail, chunk)?;
         }
 
-        Expr::Capture(CaptureOffset(i)) => {
-            chunk.emit(Op::PushCapture(*i));
+        Expr::Capture(capture_offset) => {
+            chunk.emit(Op::PushCapture(*capture_offset));
         }
 
         Expr::Call { proc, arg } => {
@@ -100,8 +100,8 @@ fn compile_expr(
             chunk.emit(Op::PushValue(Value::Boolean(*value)));
         }
 
-        Expr::Local(StackOffset(offset)) => {
-            chunk.emit(Op::PushLocal(*offset));
+        Expr::Local(stack_offset) => {
+            chunk.emit(Op::PushLocal(*stack_offset));
         }
 
         Expr::Proc { body, captures } => {

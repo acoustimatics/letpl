@@ -3,6 +3,8 @@
 use std::fmt;
 use std::rc::Rc;
 
+use crate::offset::{CaptureOffset, StackOffset};
+
 /// Represents a procedure and its captured environment.
 pub struct Procedure {
     start: usize,
@@ -110,12 +112,13 @@ pub enum Op {
     /// procedure onto the stack.
     MakeProc(usize, Vec<Capture>),
 
-    PushCapture(usize),
+    /// Pushes a captured value onto the stack.
+    PushCapture(CaptureOffset),
 
     PushGlobal(usize),
 
     /// Pushes a environment binding onto the stack.
-    PushLocal(usize),
+    PushLocal(StackOffset),
 
     /// Push a value onto the stack.
     PushValue(Value),
@@ -130,38 +133,78 @@ pub enum Op {
 
 struct Frame {
     next_op: usize,
-    stack_index: usize,
+    stack_base: StackOffset,
     captures: Rc<Vec<Value>>,
 }
 
 impl Frame {
-    fn new(next_op: usize, stack_index: usize, captures: Rc<Vec<Value>>) -> Self {
+    fn new(next_op: usize, stack_base: StackOffset, captures: Rc<Vec<Value>>) -> Self {
         Self {
             next_op,
-            stack_index,
+            stack_base,
             captures,
         }
     }
 }
 
-macro_rules! pop {
-    ($stack:expr) => {
-        $stack.pop().unwrap()
-    };
+struct ValueStack {
+    stack: Vec<Value>,
 }
 
-macro_rules! pop_int {
-    ($stack:expr) => {
-        $stack.pop().unwrap().as_int()
-    };
+impl ValueStack {
+    fn new() -> Self {
+        let stack = Vec::new();
+        Self { stack }
+    }
+
+    fn len(&self) -> usize {
+        self.stack.len()
+    }
+
+    fn pop(&mut self) -> Result<Value, String> {
+        if let Some(value) = self.stack.pop() {
+            Ok(value)
+        } else {
+            Err(String::from("stack underflow"))
+        }
+    }
+
+    fn pop_bool(&mut self) -> Result<bool, String> {
+        self.pop()?.as_bool()
+    }
+
+    fn pop_int(&mut self) -> Result<i64, String> {
+        self.pop()?.as_int()
+    }
+
+    fn pop_to(&mut self, base: StackOffset) -> Result<(), String> {
+        let StackOffset(base) = base;
+        let top = self.stack.len();
+        for _ in base..top {
+            if let None = self.stack.pop() {
+                return Err(String::from("stack underflow"));
+            }
+        }
+
+        Ok(())
+    }
+
+    fn push(&mut self, value: Value) {
+        self.stack.push(value)
+    }
+
+    fn value_at(&self, base: StackOffset, offset: StackOffset) -> &Value {
+        let StackOffset(absolute_offset) = base + offset;
+        &self.stack[absolute_offset]
+    }
 }
 
 pub fn run(program: &[Op]) -> Result<Value, String> {
-    let mut stack = Vec::<Value>::new();
+    let mut stack = ValueStack::new();
     let mut call_stack = Vec::<Frame>::new();
 
     let mut next_op = 0;
-    let mut frame_stack_index = 0;
+    let mut stack_base = StackOffset(0);
     let mut captures = Rc::new(Vec::<Value>::new());
 
     while next_op < program.len() {
@@ -170,31 +213,33 @@ pub fn run(program: &[Op]) -> Result<Value, String> {
 
         match op {
             Op::Assert { line } => {
-                if !pop!(stack).as_bool()? {
+                if !stack.pop_bool()? {
                     let msg = format!("Assert at line {line}");
                     return Err(msg.to_string());
                 }
             }
 
             Op::Call => {
-                let calling_frame = Frame::new(next_op, frame_stack_index, captures);
+                let calling_frame = Frame::new(next_op, stack_base, captures);
                 call_stack.push(calling_frame);
 
-                frame_stack_index = stack.len() - 2;
-                let p = stack[frame_stack_index].as_proc()?;
+                stack_base = StackOffset(stack.len() - 2);
+
+                let p = stack.value_at(stack_base, StackOffset(0)).as_proc()?;
+
                 next_op = p.start;
                 captures = Rc::clone(&p.captures);
             }
 
             Op::Diff => {
-                let x2 = pop_int!(stack)?;
-                let x1 = pop_int!(stack)?;
+                let x2 = stack.pop_int()?;
+                let x1 = stack.pop_int()?;
                 let v = Value::Integer(x1 - x2);
                 stack.push(v);
             }
 
             Op::IsZero => {
-                let x = pop_int!(stack)?;
+                let x = stack.pop_int()?;
                 let v = Value::Boolean(x == 0);
                 stack.push(v);
             }
@@ -204,7 +249,7 @@ pub fn run(program: &[Op]) -> Result<Value, String> {
             }
 
             Op::JumpTrue(address) => {
-                if pop!(stack).as_bool()? {
+                if stack.pop_bool()? {
                     next_op = *address;
                 }
             }
@@ -213,7 +258,9 @@ pub fn run(program: &[Op]) -> Result<Value, String> {
                 let proc_captures: Vec<Value> = capture_ops
                     .iter()
                     .map(|c| match c {
-                        Capture::Local(index) => stack[frame_stack_index + index].clone(),
+                        Capture::Local(index) => {
+                            stack.value_at(stack_base, StackOffset(*index)).clone()
+                        }
                         Capture::Capture(index) => captures[*index].clone(),
                     })
                     .collect();
@@ -223,18 +270,20 @@ pub fn run(program: &[Op]) -> Result<Value, String> {
                 stack.push(value);
             }
 
-            Op::PushCapture(capture_index) => {
-                let v = captures[*capture_index].clone();
+            Op::PushCapture(CaptureOffset(capture_offset)) => {
+                let v = captures[*capture_offset].clone();
                 stack.push(v);
             }
 
             Op::PushGlobal(stack_index) => {
-                let v = stack[*stack_index].clone();
+                let v = stack
+                    .value_at(StackOffset(*stack_index), StackOffset(0))
+                    .clone();
                 stack.push(v);
             }
 
-            Op::PushLocal(stack_index) => {
-                let v = stack[frame_stack_index + stack_index].clone();
+            Op::PushLocal(offset) => {
+                let v = stack.value_at(stack_base, *offset).clone();
                 stack.push(v);
             }
 
@@ -243,26 +292,26 @@ pub fn run(program: &[Op]) -> Result<Value, String> {
             }
 
             Op::Return => {
-                let return_value = stack[stack.len() - 1].clone();
-                for _ in frame_stack_index..stack.len() {
-                    pop!(stack);
-                }
+                let return_value = stack
+                    .value_at(StackOffset(stack.len() - 1), StackOffset(0))
+                    .clone();
+                stack.pop_to(stack_base)?;
                 stack.push(return_value);
 
-                let frame = pop!(call_stack);
+                let Some(frame) = call_stack.pop() else {
+                    return Err(String::from("call stack underflow"));
+                };
                 next_op = frame.next_op;
-                frame_stack_index = frame.stack_index;
+                stack_base = frame.stack_base;
                 captures = frame.captures;
             }
 
             Op::TailCall => {
-                let argument = pop!(stack);
-                let proc = pop!(stack);
+                let argument = stack.pop()?;
+                let proc = stack.pop()?;
 
                 // Cleanup stack frame.
-                for _ in frame_stack_index..stack.len() {
-                    pop!(stack);
-                }
+                stack.pop_to(stack_base)?;
 
                 // Set up a jump to procedure.
                 {
@@ -279,5 +328,5 @@ pub fn run(program: &[Op]) -> Result<Value, String> {
         }
     }
 
-    Ok(pop!(stack))
+    stack.pop()
 }
