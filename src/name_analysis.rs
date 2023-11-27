@@ -2,7 +2,7 @@
 
 use crate::ast;
 use crate::ast::nameless;
-use crate::offset::{CaptureOffset, StackOffset};
+use crate::offset::{Capture, CaptureOffset, StackOffset};
 use crate::table::Table;
 
 fn lookup<'a, T: Clone>(bindings: &'a Option<Table<T>>, name: &str) -> Option<&'a T> {
@@ -12,7 +12,7 @@ fn lookup<'a, T: Clone>(bindings: &'a Option<Table<T>>, name: &str) -> Option<&'
     }
 }
 
-struct CaptureTable(Table<nameless::Capture>);
+struct CaptureTable(Table<Capture>);
 
 impl CaptureTable {
     fn new() -> Self {
@@ -20,7 +20,7 @@ impl CaptureTable {
     }
 
     fn add_local_capture(&mut self, name: String, stack_offset: StackOffset) -> CaptureOffset {
-        let capture = nameless::Capture::Local(stack_offset);
+        let capture = Capture::Local(stack_offset);
         self.push(name, capture)
     }
 
@@ -29,7 +29,7 @@ impl CaptureTable {
         name: String,
         outer_capture_offset: CaptureOffset,
     ) -> CaptureOffset {
-        let capture = nameless::Capture::Capture(outer_capture_offset);
+        let capture = Capture::Capture(outer_capture_offset);
         self.push(name, capture)
     }
 
@@ -40,7 +40,7 @@ impl CaptureTable {
             .map(|offset| CaptureOffset(offset))
     }
 
-    pub fn push(&mut self, name: String, capture: nameless::Capture) -> CaptureOffset {
+    pub fn push(&mut self, name: String, capture: Capture) -> CaptureOffset {
         let CaptureTable(table) = self;
         table.push(name, capture);
         CaptureOffset(table.len() - 1)
@@ -286,8 +286,7 @@ fn resolve_names_proc(
     state.begin_proc(proc_name, param_name);
     let body = resolve_names_expr(body, state)?;
     let CaptureTable(capture_table) = state.end_proc();
-    let captures: Vec<nameless::Capture> =
-        capture_table.items.iter().map(|item| item.value).collect();
+    let captures: Vec<Capture> = capture_table.items.iter().map(|item| item.value).collect();
     state.push();
     Ok(Box::new(nameless::Expr::Proc { body, captures }))
 }

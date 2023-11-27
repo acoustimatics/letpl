@@ -33,3 +33,9 @@ impl std::ops::SubAssign for StackOffset {
         self.0 -= other.0;
     }
 }
+
+#[derive(Clone, Copy)]
+pub enum Capture {
+    Local(StackOffset),
+    Capture(CaptureOffset),
+}

@@ -187,7 +187,7 @@ impl fmt::Display for TypeTag {
 
 pub mod nameless {
     //! A namless version of the AST, that is, an AST without identifiers.
-    use crate::offset::{CaptureOffset, StackOffset};
+    use crate::offset::{Capture, CaptureOffset, StackOffset};
 
     pub struct Program {
         pub expr: Box<Expr>,
@@ -242,11 +242,5 @@ pub mod nameless {
             left: Box<Expr>,
             right: Box<Expr>,
         },
-    }
-
-    #[derive(Clone, Copy)]
-    pub enum Capture {
-        Local(StackOffset),
-        Capture(CaptureOffset),
     }
 }
