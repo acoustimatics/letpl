@@ -109,7 +109,7 @@ pub enum Op {
     /// Pushes a captured value onto the stack.
     PushCapture(CaptureOffset),
 
-    PushGlobal(usize),
+    PushGlobal(StackOffset),
 
     /// Pushes a environment binding onto the stack.
     PushLocal(StackOffset),
@@ -269,10 +269,8 @@ pub fn run(program: &[Op]) -> Result<Value, String> {
                 stack.push(v);
             }
 
-            Op::PushGlobal(stack_index) => {
-                let v = stack
-                    .value_at(StackOffset(*stack_index), StackOffset(0))
-                    .clone();
+            Op::PushGlobal(stack_offset) => {
+                let v = stack.value_at(*stack_offset, StackOffset(0)).clone();
                 stack.push(v);
             }
 

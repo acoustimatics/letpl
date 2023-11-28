@@ -3,7 +3,6 @@
 use std::fmt;
 
 use crate::ast::nameless::{Expr, Program};
-use crate::offset::StackOffset;
 use crate::runtime::{Op, Value};
 
 #[derive(Copy, Clone, PartialEq)]
@@ -66,8 +65,8 @@ fn compile_expr(
             chunk.emit(Op::Diff);
         }
 
-        Expr::Global(StackOffset(offset)) => {
-            chunk.emit(Op::PushGlobal(*offset));
+        Expr::Global(stack_offset) => {
+            chunk.emit(Op::PushGlobal(*stack_offset));
         }
 
         Expr::If {
