@@ -3,7 +3,7 @@
 use std::fmt;
 use std::rc::Rc;
 
-use crate::offset::{CaptureOffset, StackOffset};
+use crate::offset::{Capture, CaptureOffset, StackOffset};
 
 /// Represents a procedure and its captured environment.
 pub struct Procedure {
@@ -69,12 +69,6 @@ impl fmt::Debug for Value {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{self}")
     }
-}
-
-#[derive(Debug)]
-pub enum Capture {
-    Local(usize),
-    Capture(usize),
 }
 
 /// Represents a VM operation.
@@ -258,10 +252,10 @@ pub fn run(program: &[Op]) -> Result<Value, String> {
                 let proc_captures: Vec<Value> = capture_ops
                     .iter()
                     .map(|c| match c {
-                        Capture::Local(index) => {
-                            stack.value_at(stack_base, StackOffset(*index)).clone()
+                        Capture::Local(stack_offset) => {
+                            stack.value_at(stack_base, *stack_offset).clone()
                         }
-                        Capture::Capture(index) => captures[*index].clone(),
+                        Capture::Capture(CaptureOffset(offset)) => captures[*offset].clone(),
                     })
                     .collect();
                 let proc = Procedure::new(*start, proc_captures);

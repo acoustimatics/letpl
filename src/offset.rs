@@ -34,7 +34,7 @@ impl std::ops::SubAssign for StackOffset {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub enum Capture {
     Local(StackOffset),
     Capture(CaptureOffset),

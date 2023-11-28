@@ -3,8 +3,8 @@
 use std::fmt;
 
 use crate::ast::nameless::{Expr, Program};
-use crate::offset::{Capture, CaptureOffset, StackOffset};
-use crate::runtime::{self, Op, Value};
+use crate::offset::StackOffset;
+use crate::runtime::{Op, Value};
 
 #[derive(Copy, Clone, PartialEq)]
 enum ExprPos {
@@ -109,13 +109,7 @@ fn compile_expr(
             let start = chunk.next_address();
             compile_expr(body, Scope::Local, ExprPos::Tail, chunk)?;
             chunk.emit(Op::Return);
-            let captures: Vec<runtime::Capture> = captures
-                .iter()
-                .map(|c| match c {
-                    Capture::Local(StackOffset(i)) => runtime::Capture::Local(*i),
-                    Capture::Capture(CaptureOffset(i)) => runtime::Capture::Capture(*i),
-                })
-                .collect();
+            let captures = captures.clone();
             let make_proc_index = chunk.emit(Op::MakeProc(start, captures));
             chunk.patch(branch_make_proc, make_proc_index);
         }
