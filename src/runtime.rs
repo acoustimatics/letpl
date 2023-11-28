@@ -1,11 +1,11 @@
-//! A stack-based bytecode VM.
+//! A stack-based VM.
 
 use std::fmt;
 use std::rc::Rc;
 
 use crate::offset::{Capture, CaptureOffset, StackOffset};
 
-/// Represents a procedure and its captured environment.
+/// A procedure's location and captured environment.
 pub struct Procedure {
     start: usize,
     captures: Rc<Vec<Value>>,
@@ -24,7 +24,7 @@ impl fmt::Display for Procedure {
     }
 }
 
-/// Represents final value to which an expression can evalutate.
+/// Values to which expressions evalutate.
 #[derive(Clone)]
 pub enum Value {
     Integer(i64),
@@ -71,7 +71,7 @@ impl fmt::Debug for Value {
     }
 }
 
-/// Represents a VM operation.
+/// The VM's operations.
 #[derive(Debug)]
 pub enum Op {
     /// Pop a Boolean from the stack. If the value is false then halt execution
@@ -141,6 +141,7 @@ impl Frame {
     }
 }
 
+/// A stack of Value objects.
 struct ValueStack {
     stack: Vec<Value>,
 }
@@ -193,6 +194,7 @@ impl ValueStack {
     }
 }
 
+/// Run a VM program returning the final value on the stack.
 pub fn run(program: &[Op]) -> Result<Value, String> {
     let mut stack = ValueStack::new();
     let mut call_stack = Vec::<Frame>::new();
