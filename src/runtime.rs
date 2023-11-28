@@ -5,14 +5,37 @@ use std::rc::Rc;
 
 use crate::offset::{Capture, CaptureOffset, StackOffset};
 
+/// An offset in a VM program.
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub struct Address(pub usize);
+
+impl Address {
+    fn lookup<'a>(&mut self, program: &'a [Op]) -> Option<&'a Op> {
+        let address = self.0;
+        self.0 += 1;
+
+        if address < program.len() {
+            Some(&program[address])
+        } else {
+            None
+        }
+    }
+}
+
+impl fmt::Display for Address {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "@{}", self.0)
+    }
+}
+
 /// A procedure's location and captured environment.
 pub struct Procedure {
-    start: usize,
+    start: Address,
     captures: Rc<Vec<Value>>,
 }
 
 impl Procedure {
-    fn new(start: usize, captures: Vec<Value>) -> Self {
+    fn new(start: Address, captures: Vec<Value>) -> Self {
         let captures = Rc::new(captures);
         Self { start, captures }
     }
@@ -20,7 +43,7 @@ impl Procedure {
 
 impl fmt::Display for Procedure {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "<proc @{}>", self.start)
+        write!(f, "<proc {}>", self.start)
     }
 }
 
@@ -96,15 +119,15 @@ pub enum Op {
     IsZero,
 
     /// Unconditionally jump to an index.
-    Jump(usize),
+    Jump(Address),
 
     /// Pop a Boolean from the stack. If the popped value is `true` then jump to
     /// an index.
-    JumpTrue(usize),
+    JumpTrue(Address),
 
     /// Make a procedure using a start index and the environment. Push the
     /// procedure onto the stack.
-    MakeProc(usize, Vec<Capture>),
+    MakeProc(Address, Vec<Capture>),
 
     /// Pushes a captured value onto the stack.
     PushCapture(CaptureOffset),
@@ -126,13 +149,13 @@ pub enum Op {
 }
 
 struct Frame {
-    next_op: usize,
+    next_op: Address,
     stack_base: StackOffset,
     captures: Rc<Vec<Value>>,
 }
 
 impl Frame {
-    fn new(next_op: usize, stack_base: StackOffset, captures: Rc<Vec<Value>>) -> Self {
+    fn new(next_op: Address, stack_base: StackOffset, captures: Rc<Vec<Value>>) -> Self {
         Self {
             next_op,
             stack_base,
@@ -199,14 +222,11 @@ pub fn run(program: &[Op]) -> Result<Value, String> {
     let mut stack = ValueStack::new();
     let mut call_stack = Vec::<Frame>::new();
 
-    let mut next_op = 0;
+    let mut next_op = Address(0);
     let mut stack_base = StackOffset(0);
     let mut captures = Rc::new(Vec::<Value>::new());
 
-    while next_op < program.len() {
-        let op = &program[next_op];
-        next_op += 1;
-
+    while let Some(op) = next_op.lookup(program) {
         match op {
             Op::Assert { line } => {
                 if !stack.pop_bool()? {

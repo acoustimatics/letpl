@@ -3,7 +3,7 @@
 use std::fmt;
 
 use crate::ast::nameless::{Expr, Program};
-use crate::runtime::{Op, Value};
+use crate::runtime::{Address, Op, Value};
 
 #[derive(Copy, Clone, PartialEq)]
 enum ExprPos {
@@ -75,9 +75,9 @@ fn compile_expr(
             alternate,
         } => {
             compile_expr(test, scope, ExprPos::Operand, chunk)?;
-            let branch_to_consq = chunk.emit(Op::JumpTrue(0));
+            let branch_to_consq = chunk.emit(Op::JumpTrue(Address(0)));
             compile_expr(alternate, scope, ExprPos::Tail, chunk)?;
-            let branch_to_end = chunk.emit(Op::Jump(0));
+            let branch_to_end = chunk.emit(Op::Jump(Address(0)));
             let consq_start = chunk.next_address();
             compile_expr(consequent, scope, ExprPos::Tail, chunk)?;
             let if_end = chunk.next_address();
@@ -104,7 +104,7 @@ fn compile_expr(
         }
 
         Expr::Proc { body, captures } => {
-            let branch_make_proc = chunk.emit(Op::Jump(0));
+            let branch_make_proc = chunk.emit(Op::Jump(Address(0)));
             let start = chunk.next_address();
             compile_expr(body, Scope::Local, ExprPos::Tail, chunk)?;
             chunk.emit(Op::Return);
@@ -123,16 +123,17 @@ impl Chunk {
         Chunk { ops }
     }
 
-    fn emit(&mut self, op: Op) -> usize {
+    fn emit(&mut self, op: Op) -> Address {
         self.ops.push(op);
-        self.ops.len() - 1
+        Address(self.ops.len() - 1)
     }
 
-    fn next_address(&self) -> usize {
-        self.ops.len()
+    fn next_address(&self) -> Address {
+        Address(self.ops.len())
     }
 
-    fn patch(&mut self, patch_at: usize, target: usize) {
+    fn patch(&mut self, patch_at: Address, target: Address) {
+        let Address(patch_at) = patch_at;
         match &self.ops[patch_at] {
             Op::Jump(_) => {
                 self.ops[patch_at] = Op::Jump(target);
