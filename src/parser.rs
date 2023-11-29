@@ -49,6 +49,14 @@ impl<'a> Parser<'a> {
         }
     }
 
+    fn is_match(&mut self, token_tag: TokenTag) -> Result<bool, String> {
+        let is_match = self.current.tag == token_tag;
+        if is_match {
+            self.advance()?;
+        }
+        Ok(is_match)
+    }
+
     fn program(&mut self) -> Result<Program, String> {
         let expr = self.expr()?;
         self.expect(TokenTag::Eof)?;
@@ -91,11 +99,14 @@ impl<'a> Parser<'a> {
         self.advance()?;
         self.expect(TokenTag::LeftParen)?;
         let left = self.expr()?;
-        self.expect(TokenTag::Comma)?;
-        let right = self.expr()?;
-        self.expect(TokenTag::RightParen)?;
-
-        Ok(Box::new(Expr::Subtract { left, right }))
+        if self.is_match(TokenTag::RightParen)? {
+            Ok(Box::new(Expr::Negate(left)))
+        } else {
+            self.expect(TokenTag::Comma)?;
+            let right = self.expr()?;
+            self.expect(TokenTag::RightParen)?;
+            Ok(Box::new(Expr::Subtract { left, right }))
+        }
     }
 
     fn is_zero(&mut self) -> ExprResult {

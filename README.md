@@ -11,6 +11,7 @@ letpl's grammar is:
     Expression ::= Number
                ::= "zero?" "(" Expression ")"
                ::= "-" "(" Expression "," Expression ")"
+               ::= "-" "(" Expression ")"
                ::= "if" Expression "then" Expression "else" Expression
                ::= Identifier
                ::= "let" Identifier "=" Expression "in" Expression
@@ -40,6 +41,8 @@ Numbers are integer values of type `int`.  There is a runtime error if a number 
 `zero?(x)` evaluates to `true` if `x` is `0`, otherwise it evaluates to `false`.  The expression `x` must evaulate to an `int`.
 
 `-(x, y)` evaluates to `x - y`.  Both expressions `x` and `y` must evaluate to an `int`.
+
+`-(x)` evaluates to `-x`. `x` must evaluate to an `int`.
 
 `if guard then consequent else alternative` evaluates to `consequent` if `guard` is `true`, otherwise it evaluates to `alternative`. The expression `guard` must evaulate to a `bool`.  The expressions `consequent` and `alternative` must have the same type.
 

@@ -65,6 +65,11 @@ fn compile_expr(
             chunk.emit(Op::Diff);
         }
 
+        Expr::Negate(expr) => {
+            compile_expr(expr, scope, ExprPos::Operand, chunk)?;
+            chunk.emit(Op::Negate);
+        }
+
         Expr::Global(stack_offset) => {
             chunk.emit(Op::PushGlobal(*stack_offset));
         }

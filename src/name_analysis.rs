@@ -199,6 +199,13 @@ fn resolve_names_expr(
             Ok(Box::new(nameless::Expr::LiteralInt(*x)))
         }
 
+        ast::Expr::Negate(e) => {
+            let e = resolve_names_expr(e, state)?;
+            state.pop();
+            state.push();
+            Ok(Box::new(nameless::Expr::Negate(e)))
+        }
+
         ast::Expr::Subtract { left, right } => {
             let left = resolve_names_expr(left, state)?;
             let right = resolve_names_expr(right, state)?;

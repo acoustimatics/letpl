@@ -129,6 +129,9 @@ pub enum Op {
     /// procedure onto the stack.
     MakeProc(Address, Vec<Capture>),
 
+    /// Negates the top of the stack.
+    Negate,
+
     /// Pushes a captured value onto the stack.
     PushCapture(CaptureOffset),
 
@@ -284,6 +287,12 @@ pub fn run(program: &[Op]) -> Result<Value, String> {
                 let proc = Rc::new(proc);
                 let value = Value::Procedure(proc);
                 stack.push(value);
+            }
+
+            Op::Negate => {
+                let i = stack.pop_int()?;
+                let v = Value::Integer(-i);
+                stack.push(v);
             }
 
             Op::PushCapture(CaptureOffset(capture_offset)) => {

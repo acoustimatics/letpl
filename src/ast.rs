@@ -56,6 +56,9 @@ pub enum Expr {
     /// A name lookup expression.
     Name(String),
 
+    /// An expression that negates its inner expression.
+    Negate(Box<Expr>),
+
     /// A procedure definition expression.
     Proc { param: Param, body: Box<Expr> },
 
@@ -231,6 +234,9 @@ pub mod nameless {
         LiteralInt(i64),
 
         Local(StackOffset),
+
+        /// An expression that negates its inner expression.
+        Negate(Box<Expr>),
 
         Proc {
             body: Box<Expr>,

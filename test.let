@@ -46,6 +46,12 @@ let eq? = proc (left: int) proc (right: int)
     zero?(compare)
 in
 
+# `-` also negates an integer
+let x = 100 in
+let y = -(x) in
+let z = -(100, 200) in
+assert ((eq? z) y) then
+
 let add = proc (x: int) proc (y: int)
     -(x, -(0, y))
 in

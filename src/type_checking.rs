@@ -130,5 +130,14 @@ fn type_of_expr(expr: &Expr, env: &mut Table<Type>) -> Result<Type, String> {
                 Err(msg)
             }
         }
+
+        Expr::Negate(expr) => {
+            let t_expr = type_of_expr(expr, env)?;
+            if !t_expr.is_int() {
+                let msg = format!("-() argument expects `int` but got `{t_expr}`");
+                return Err(msg);
+            }
+            Ok(Type::new_int())
+        }
     }
 }
