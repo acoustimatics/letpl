@@ -1,7 +1,8 @@
 //! A recursive decent letpl parser.
 
-use crate::ast::{Expr, Param, Program, Type};
+use crate::ast::{Expr, Param, Program};
 use crate::scanner::{Scanner, Token, TokenTag};
+use crate::types::Type;
 
 type ExprResult = Result<Box<Expr>, String>;
 

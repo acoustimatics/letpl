@@ -9,13 +9,14 @@ mod runtime;
 mod scanner;
 mod table;
 mod type_checking;
+mod types;
 
 use std::error::Error;
 use std::io::Write;
 use std::{env, fs, io};
 
-use ast::Type;
 use runtime::Value;
+use types::Type;
 
 type EvalResult = Result<(Value, Type), Box<dyn Error>>;
 

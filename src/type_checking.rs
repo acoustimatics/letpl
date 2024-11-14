@@ -1,7 +1,8 @@
 //! Type checks a letpl program
 
-use crate::ast::{Expr, Program, Type};
+use crate::ast::{Expr, Program};
 use crate::table::Table;
+use crate::types::Type;
 
 pub fn type_of_program(program: &Program) -> Result<Type, String> {
     let mut env = Table::new();
